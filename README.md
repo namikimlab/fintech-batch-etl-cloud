@@ -1,4 +1,4 @@
-NamKim Fintech Batch ETL Pipeline
+K-pop Card Hunters - Fintech Batch ETL Pipeline
 
 Fintechs struggle with late, duplicate, ungoverned transaction data, blocking fraud detection and customer analytics.
 

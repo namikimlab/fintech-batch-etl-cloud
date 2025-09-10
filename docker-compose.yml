@@ -1,0 +1,11 @@
+services:
+  etl:
+    build: ./docker/etl
+    env_file: .env
+    volumes:
+      - ./:/app           # code + Makefile
+      - ./data:/app/data  # local lake (bronze/silver)
+    working_dir: /app
+    tty: true
+    init: true
+    command: bash -lc "tail -f /dev/null"
