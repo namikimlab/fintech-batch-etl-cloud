@@ -33,3 +33,22 @@ smoke:
 # One-liner: build → seed → spark → smoke
 run:
 	make up && make seed && make spark && make smoke
+
+airflow-up:
+	docker compose up -d --build airflow-webserver airflow-scheduler
+
+airflow-init:
+	docker compose exec -T airflow-webserver airflow db init
+	docker compose exec -T airflow-webserver airflow users create \
+	  --username admin --password admin --firstname Nami --lastname Kim \
+	  --role Admin --email you@example.com
+
+airflow-logs:
+	docker compose logs -f airflow-scheduler
+
+airflow-trigger:
+	docker compose exec -T airflow-webserver airflow dags trigger daily_batch_local
+
+airflow-backfill:
+	@if [ -z "$(FROM)" ] || [ -z "$(TO)" ]; then echo "Usage: make airflow-backfill FROM=YYYY-MM-DD TO=YYYY-MM-DD"; exit 2; fi
+	docker compose exec -T airflow-webserver airflow dags backfill daily_batch_local -s $(FROM) -e $(TO)

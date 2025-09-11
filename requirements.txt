@@ -1,0 +1,4 @@
+# Core packages for Airflow ETL container
+pyspark==3.5.1   # For Spark jobs
+faker            # For synthetic data generation in faker_seed.py
+pandas==2.2.2

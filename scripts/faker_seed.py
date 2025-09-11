@@ -24,6 +24,7 @@ def gen_txn(fk, txn_ts, customer_id=None, merchant_id=None):
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--days", type=int, default=7)
+    ap.add_argument("--for-date", type=str, default=None, help="YYYY-MM-DD to seed exactly one day")
     ap.add_argument("--records-per-day", type=int, default=5000)
     ap.add_argument("--dup-rate", type=float, default=0.02)
     ap.add_argument("--late-rate", type=float, default=0.05)
@@ -31,15 +32,22 @@ def main():
     args = ap.parse_args()
 
     fk = Faker()
-    now = datetime.utcnow()
     os.makedirs(args.bronze_dir, exist_ok=True)
 
     customers = [str(uuid.uuid4()) for _ in range(2000)]
     merchants = [str(uuid.uuid4()) for _ in range(300)]
     recent_rows = []
 
-    for d in range(args.days):
-        ingest_day = (now - timedelta(days=(args.days-1-d))).date()
+    # If --for-date is provided, override days loop
+    if args.for_date is not None:
+        from datetime import date
+        target = datetime.strptime(args.for_date, "%Y-%m-%d").date()
+        days_to_generate = [target]
+    else:
+        now = datetime.utcnow()
+        days_to_generate = [(now - timedelta(days=(args.days-1-d))).date() for d in range(args.days)]
+
+    for ingest_day in days_to_generate:
         day_dir = os.path.join(args.bronze_dir, f"transactions/ingest_date={ingest_day.isoformat()}")
         os.makedirs(day_dir, exist_ok=True)
         out_fp = os.path.join(day_dir, f"part-00000-{uuid.uuid4().hex}.csv")
@@ -52,17 +60,14 @@ def main():
                                 customer_id=random.choice(customers),
                                 merchant_id=random.choice(merchants)))
 
-        # Inject duplicates (exact copies)
         dup_count = int(args.dup_rate * len(rows))
         if dup_count > 0:
             rows += random.sample(rows, dup_count)
 
-        # Late arrivals (sample from earlier generated rows)
         late_count = int(args.late_rate * len(recent_rows)) if recent_rows else 0
         if late_count > 0:
             rows += random.sample(recent_rows, late_count)
 
-        # Track recent for future late arrivals
         recent_rows += rows[-min(5000, len(rows)):]  # cap memory
 
         with open(out_fp, "w", newline="", encoding="utf-8") as f:
