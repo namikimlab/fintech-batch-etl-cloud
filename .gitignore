@@ -1,2 +1,46 @@
+# --- Python ---
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+*.egg-info/
+*.egg
+.venv/
 .env
+.env.*
+!.env.example   # keep template
+
+# --- Airflow ---
 logs/
+airflow.cfg
+unittests.cfg
+
+# --- dbt ---
+dbt/target/
+dbt/dbt_packages/
+dbt/profiles.yml   # use profiles.yml.example instead
+
+# --- Docker ---
+*.pid
+*.log
+*.sock
+
+# --- Data Lake Outputs ---
+data/
+*.parquet
+*.csv
+
+# --- Great Expectations ---
+great_expectations/uncommitted/
+
+# --- Terraform ---
+.terraform/
+*.tfstate
+*.tfstate.*
+crash.log
+
+# --- OS / IDE ---
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
