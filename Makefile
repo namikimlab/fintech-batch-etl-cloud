@@ -28,14 +28,7 @@ spark:
 
 # Quick existence check
 smoke:
-	docker compose exec etl python - <<-'PY'
-	import os
-	root = os.getenv('SILVER_DIR', '/app/data/silver')
-	print('silver_exists=', os.path.isdir(root))
-	for dp, _, fn in os.walk(root):
-	    if fn:
-	        print('partition', dp.replace(root, '').lstrip('/'), 'files', len(fn))
-	PY
+	docker compose exec etl ls -R /app/data/silver/transactions || true
 
 # One-liner: build → seed → spark → smoke
 run:
