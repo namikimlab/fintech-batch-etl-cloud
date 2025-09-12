@@ -1,0 +1,14 @@
+name: "fintech_batch_etl"
+version: "0.1.0"
+config-version: 2
+
+profile: "fintech_duckdb"
+
+model-paths: ["models"]
+target-path: "target"
+clean-targets: ["target"]
+
+models:
+  +materialized: table
+  staging:
+    +materialized: view

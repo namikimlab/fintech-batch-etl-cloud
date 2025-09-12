@@ -1,0 +1,10 @@
+fintech_duckdb:
+  target: dev
+  outputs:
+    dev:
+      type: duckdb
+      path: /opt/dbt/duckdb/fintech.duckdb
+      threads: 4
+      # Make the local silver parquet folder queryable as an external source
+      extensions: ["httpfs","parquet"]
+      # We'll read Parquet via dbt SQL using read_parquet() (DuckDB’s function)

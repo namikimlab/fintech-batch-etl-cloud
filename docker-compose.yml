@@ -18,6 +18,8 @@ x-airflow-common: &airflow-common
     - ./data:/app/data
     - ./scripts:/opt/airflow/scripts
     - ./jobs:/opt/airflow/jobs
+    - ./dbt:/opt/airflow/dbt
+    - ./data/duckdb:/opt/dbt/duckdb  
     # - ./requirements.txt:/opt/airflow/requirements.txt
   user: "${AIRFLOW_UID}:0"
   depends_on:

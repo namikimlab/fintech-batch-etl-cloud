@@ -1,0 +1,23 @@
+version: 2
+models:
+  - name: stg_transactions
+    columns:
+      - name: transaction_id
+        tests: [not_null, unique]
+      - name: txn_ts
+        tests: [not_null]
+      - name: status
+        tests:
+          - accepted_values:
+              values: ['approved','declined']
+
+  - name: fact_transactions
+    columns:
+      - name: transaction_id
+        tests: [not_null, unique]
+      - name: amount
+        tests:
+          - not_null
+
+  - name: mart_sales_daily
+  - name: mart_rfm_customer

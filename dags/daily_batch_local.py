@@ -48,4 +48,14 @@ with DAG(
         ),
     )
 
-    seed_for_day >> spark_clean_for_day
+    dbt_run = BashOperator(
+        task_id="dbt_run",
+        bash_command=(
+            "set -euo pipefail && "  # ensure error is caught
+            "cd /opt/airflow/dbt && "
+            "dbt deps && " 
+            "dbt build --profiles-dir . --target dev"
+        ),
+    )
+
+    seed_for_day >> spark_clean_for_day >> dbt_run
