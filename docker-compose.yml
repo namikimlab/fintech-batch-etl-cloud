@@ -2,6 +2,7 @@ x-airflow-common: &airflow-common
   build:
     context: .
     dockerfile: docker/airflow/Dockerfile
+  env_file: .env
   environment:
     &airflow-common-env
     AIRFLOW__CORE__EXECUTOR: LocalExecutor
@@ -10,7 +11,6 @@ x-airflow-common: &airflow-common
     AIRFLOW__WEBSERVER__EXPOSE_CONFIG: "True"
     AIRFLOW_UID: ${AIRFLOW_UID}
     PYSPARK_PYTHON: python
-    # _PIP_ADDITIONAL_REQUIREMENTS: "-r /opt/airflow/requirements.txt"
   volumes:
     - ./dags:/opt/airflow/dags
     - ./logs:/opt/airflow/logs
@@ -19,8 +19,8 @@ x-airflow-common: &airflow-common
     - ./scripts:/opt/airflow/scripts
     - ./jobs:/opt/airflow/jobs
     - ./dbt:/opt/airflow/dbt
-    - ./data/duckdb:/opt/dbt/duckdb  
-    # - ./requirements.txt:/opt/airflow/requirements.txt
+    - ./data/duckdb:/opt/dbt/duckdb
+    - ~/.aws:/home/airflow/.aws:ro
   user: "${AIRFLOW_UID}:0"
   depends_on:
     postgres:
@@ -65,6 +65,8 @@ services:
   airflow-scheduler:
     <<: *airflow-common
     command: scheduler
+    ports:
+      - 8081:8081
     restart: always
 
   airflow-init:

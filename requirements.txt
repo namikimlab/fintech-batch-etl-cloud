@@ -1,6 +1,16 @@
 # Core packages for Airflow ETL container
-pyspark==3.5.1   # For Spark jobs
+pyspark==3.5.2   # For Spark jobs
 faker            # For synthetic data generation in faker_seed.py
 # pandas==2.2.2
-dbt-core==1.8.6
-dbt-duckdb==1.8.2
+
+# dbt stack 
+dbt-core
+dbt-redshift
+dbt-duckdb
+
+# Airflow providers (2.10+)
+apache-airflow-providers-amazon
+apache-airflow-providers-postgres
+
+# PG driver
+psycopg2==2.9.10

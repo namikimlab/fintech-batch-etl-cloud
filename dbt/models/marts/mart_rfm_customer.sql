@@ -72,4 +72,4 @@ scored AS (
 SELECT
   *,
   (r_score * 100 + f_score * 10 + m_score) AS rfm_code
-FROM scored;
+FROM scored
