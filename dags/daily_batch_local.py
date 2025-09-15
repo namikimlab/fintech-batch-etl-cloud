@@ -19,7 +19,7 @@ with DAG(
     dag_id="daily_batch_local",
     start_date=datetime(2025, 9, 1),
     schedule="0 6 * * *",  # 06:00 KST (Airflow timezone set in compose)
-    catchup=True,
+    catchup=False,
     default_args=default_args,
     max_active_runs=1,
     description="M1: local seed -> spark (no AWS)",

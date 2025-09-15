@@ -29,6 +29,7 @@ def main():
     ap.add_argument("--dup-rate", type=float, default=0.02)
     ap.add_argument("--late-rate", type=float, default=0.05)
     ap.add_argument("--bronze-dir", type=str, default="/app/data/bronze")
+    ap.add_argument("--seed", type=int, default=None)   
     args = ap.parse_args()
 
     fk = Faker()

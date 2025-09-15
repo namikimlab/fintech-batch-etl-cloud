@@ -1,0 +1,119 @@
+# daily_batch_cloud.py
+from datetime import datetime
+import os
+from airflow import DAG
+from airflow.operators.bash import BashOperator
+from airflow.models import Variable
+from airflow.providers.amazon.aws.operators.redshift_data import RedshiftDataOperator
+
+# --- Environment Variables ---
+DATA_ROOT = os.getenv("DATA_ROOT", "/app/data")                          
+BRONZE_DIR = os.getenv("BRONZE_DIR", "/app/data/bronze")    
+SILVER_DIR = os.getenv("SILVER_DIR", "/app/data/silver")
+RECORDS_PER_DAY = os.getenv("RECORDS_PER_DAY", "5000")
+DUP_RATE = os.getenv("DUP_RATE", "0.02")
+LATE_RATE = os.getenv("LATE_RATE", "0.05")
+S3_BUCKET = Variable.get("S3_BUCKET")
+
+# --- Airflow Variables (for Redshift Data API) ---
+# Store these in Airflow → Admin → Variables
+REDSHIFT_DB = Variable.get("REDSHIFT_DB")                  
+REDSHIFT_WORKGROUP = Variable.get("REDSHIFT_WORKGROUP")    
+REDSHIFT_SCHEMA = os.getenv("REDSHIFT_SCHEMA", "public")    
+REDSHIFT_IAM_ROLE_ARN = os.getenv("REDSHIFT_IAM_ROLE_ARN")  # IAM Role for COPY (attached to the Redshift workgroup)
+
+default_args = {
+    "owner": "nami",
+    "retries": 0,
+}
+
+with DAG(
+    dag_id="daily_batch_cloud",
+    start_date=datetime(2025, 9, 1),
+    schedule="0 6 * * *",  # 6AM KST
+    catchup=False,
+    default_args=default_args,
+    max_active_runs=1,
+    description="M3 (Option B): seed → spark(S3) → Redshift COPY → dbt (facts incremental + marts)",
+    render_template_as_native_obj=True,
+    # Put your SQL template files under this folder in the container
+    template_searchpath=["/opt/airflow/sql"],
+) as dag:
+
+    # 1) Generate one day's raw CSV locally (bronze)
+    seed_for_day = BashOperator(
+        task_id="seed_for_day",
+        bash_command=(
+            "python /opt/airflow/scripts/faker_seed.py "
+            "--days 1 "
+            "--for-date {{ ds }} "
+            f"--records-per-day {RECORDS_PER_DAY} "
+            f"--dup-rate {DUP_RATE} "
+            f"--late-rate {LATE_RATE} "
+            "--seed {{ ds_nodash }} "
+            f"--bronze-dir {BRONZE_DIR}"
+        ),
+    )
+
+    # 2) Spark: bronze → S3 silver (Parquet, partitioned by y/m/d)
+    spark_clean_for_day = BashOperator(
+        task_id="spark_clean_for_day",
+        bash_command=(
+            "python /opt/airflow/jobs/clean_transactions.py "
+            f"--bronze-dir {BRONZE_DIR} "
+            f"--silver-dir {SILVER_DIR}"
+        ),
+    )
+
+    sync_silver_to_s3 = BashOperator(
+        task_id="sync_silver_to_s3",
+        bash_command=(
+            "aws s3 sync "
+            f"{SILVER_DIR}/transactions/year={{{{ ds_nodash[:4] }}}}/month={{{{ ds_nodash[4:6] }}}}/day={{{{ ds_nodash[6:8] }}}}/ "
+            f"s3://{{{{ var.value.S3_BUCKET }}}}/silver/transactions/year={{{{ ds_nodash[:4] }}}}/month={{{{ ds_nodash[4:6] }}}}/day={{{{ ds_nodash[6:8] }}}}/ "
+            "--only-show-errors"
+        ),
+        env={'AWS_CLI_HOME': '/tmp'},
+    )
+
+    # 3) Redshift: ensure staging exists, truncate, then COPY D, D-1, D-2
+    copy_stage = RedshiftDataOperator(
+        task_id="redshift_copy_stage",
+        aws_conn_id="aws_default",
+        database=REDSHIFT_DB,
+        workgroup_name=REDSHIFT_WORKGROUP,
+        params={
+            "schema": REDSHIFT_SCHEMA,
+            "iam_role": REDSHIFT_IAM_ROLE_ARN,
+            "s3_bucket": S3_BUCKET # Pass the variable to params
+        },
+        sql="copy_stg_transactions.sql",
+    )
+
+    # 4) dbt: facts (incremental MERGE) — dbt owns the fact table
+    dbt_run_facts = BashOperator(
+        task_id="dbt_run_facts",
+        bash_command=(
+            "set -euo pipefail && "
+            "cd /opt/dbt/project && "
+            "dbt deps && "
+            "dbt run --profiles-dir /opt/dbt/profiles --target redshift "
+            "--select path:models/facts "
+            "--vars '{process_date: {{ ds }}}'"
+        ),
+    )
+
+    # 5) dbt: marts (gold)
+    dbt_run_marts = BashOperator(
+        task_id="dbt_run_marts",
+        bash_command=(
+            "set -euo pipefail && "
+            "cd /opt/dbt/project && "
+            "dbt run --profiles-dir /opt/dbt/profiles --target redshift "
+            "--select path:models/marts"
+        ),
+    )
+
+    # Final task order
+    seed_for_day >> spark_clean_for_day >> sync_silver_to_s3 >> copy_stage >> dbt_run_facts >> dbt_run_marts
+

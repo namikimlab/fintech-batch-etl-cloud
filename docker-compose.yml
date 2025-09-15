@@ -6,6 +6,7 @@ x-airflow-common: &airflow-common
   environment:
     &airflow-common-env
     AIRFLOW__CORE__EXECUTOR: LocalExecutor
+    AIRFLOW__CORE__DEFAULT_TIMEZONE: Asia/Seoul 
     AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql+psycopg2://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres/${POSTGRES_DB}
     AIRFLOW__CORE__LOAD_EXAMPLES: "False"
     AIRFLOW__WEBSERVER__EXPOSE_CONFIG: "True"
@@ -21,6 +22,7 @@ x-airflow-common: &airflow-common
     - ./dbt:/opt/airflow/dbt
     - ./data/duckdb:/opt/dbt/duckdb
     - ~/.aws:/home/airflow/.aws:ro
+    - ./sql:/opt/airflow/sql
   user: "${AIRFLOW_UID}:0"
   depends_on:
     postgres:

@@ -9,7 +9,18 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
       libpq-dev \
       pkg-config \
       procps \
+      curl \
+      unzip \
     && rm -rf /var/lib/apt/lists/*
+
+# --- Install AWS CLI v2 ---
+RUN curl -fsSL "https://awscli.amazonaws.com/awscli-exe-linux-aarch64.zip" -o "/tmp/awscliv2.zip" \
+    && unzip -q /tmp/awscliv2.zip -d /tmp \
+    && /tmp/aws/install \
+    && rm -rf /tmp/aws /tmp/awscliv2.zip
+
+# create cache directory
+RUN mkdir -p /tmp/.aws/cli/cache 
 
 # --- Back to airflow user ---
 USER airflow
@@ -18,6 +29,6 @@ USER airflow
 ARG PYVER=3.12
 ARG CONSTRAINTS_URL="https://raw.githubusercontent.com/apache/airflow/constraints-2.10.2/constraints-${PYVER}.txt"
 
-# --- Python deps install with constraints (권장 방식) ---
+# --- Python deps install with constraints (recommended approach) ---
 COPY requirements.txt /opt/airflow/requirements.txt
 RUN pip install --no-cache-dir -r /opt/airflow/requirements.txt -c "${CONSTRAINTS_URL}"

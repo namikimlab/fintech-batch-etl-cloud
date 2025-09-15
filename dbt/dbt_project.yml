@@ -2,13 +2,33 @@ name: "fintech_batch_etl"
 version: "0.1.0"
 config-version: 2
 
-profile: "fintech_duckdb"
+# Cloud default; override locally with:  dbt run --profile fintech_duckdb
+profile: "fintech_redshift"
 
 model-paths: ["models"]
+seed-paths: ["seeds"]
+snapshot-paths: ["snapshots"]
+analysis-paths: ["analyses"]
+test-paths: ["tests"]
+
 target-path: "target"
-clean-targets: ["target"]
+clean-targets: ["target", "dbt_packages"]
 
 models:
-  +materialized: table
-  staging:
-    +materialized: view
+  fintech_batch_etl:
+    # Redshift uses this; DuckDB ignores schema logically.
+    +schema: "{{ env_var('REDSHIFT_SCHEMA', 'public') }}"
+    +materialized: table
+
+    staging:
+      +materialized: view
+
+    # facts: materialization is set inside the SQL with Jinja (target.type)
+    facts: {}
+
+    marts:
+      +materialized: table
+
+vars:
+  # Airflow sets this when running facts incrementally in Redshift
+  process_date: null

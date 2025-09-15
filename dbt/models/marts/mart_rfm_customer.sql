@@ -1,75 +1,98 @@
-WITH base AS (
-  SELECT *
-  FROM {{ ref('fact_transactions') }}
-),
+{{ config(materialized='table') }}
 
--- Define successful purchase rows (approved & amount > 0 & not refund)
-success AS (
-  SELECT *
-  FROM base
-  WHERE status = 'approved' AND NOT is_refund AND amount > 0
-),
-
--- Recency is based on successful purchases only
-recency AS (
-  SELECT
+with base as (
+  select
+    transaction_id,
     customer_id,
-    MAX(CAST(txn_ts AS TIMESTAMP)) AS last_purchase_ts
-  FROM success
-  GROUP BY 1
+    card_id,
+    merchant_id,
+    txn_ts,
+    amount,
+    mcc,
+    lower(status) as status,   -- normalize for robustness
+    is_refund,
+    channel
+  from {{ ref('fact_transactions') }}
 ),
 
--- Frequency on successful purchases only
-freq AS (
-  SELECT
+-- Successful purchases = approved, not refund, positive amount
+success as (
+  select *
+  from base
+  where status = 'approved' and not is_refund and amount > 0
+),
+
+-- Recency uses successful purchases only
+recency as (
+  select
     customer_id,
-    COUNT(*) AS frequency
-  FROM success
-  GROUP BY 1
+    max(cast(txn_ts as timestamp)) as last_purchase_ts
+  from success
+  group by 1
 ),
 
--- Monetary can be net (include refunds) or gross (exclude refunds).
--- Choose ONE and document it. Below = NET (includes refunds as negative).
-monet AS (
-  SELECT
+-- Frequency uses successful purchases only
+freq as (
+  select
     customer_id,
-    SUM(CASE WHEN is_refund THEN -amount ELSE amount END) AS monetary
-  FROM base
-  WHERE status = 'approved'
-  GROUP BY 1
+    count(*) as frequency
+  from success
+  group by 1
 ),
 
-tx AS (
-  SELECT
-    coalesce(r.customer_id, f.customer_id, m.customer_id) AS customer_id,
+-- Monetary = NET (refunds negative) over all approved rows
+monet as (
+  select
+    customer_id,
+    sum(case when is_refund then -amount else amount end) as monetary
+  from base
+  where status = 'approved'
+  group by 1
+),
+
+tx as (
+  select
+    coalesce(r.customer_id, f.customer_id, m.customer_id) as customer_id,
     r.last_purchase_ts,
     f.frequency,
     m.monetary
-  FROM recency r
-  FULL OUTER JOIN freq f USING (customer_id)
-  FULL OUTER JOIN monet m USING (customer_id)
-  -- If you want to drop customers with no successful purchase at all:
-  WHERE r.last_purchase_ts IS NOT NULL
+  from recency r
+  full outer join freq f using (customer_id)
+  full outer join monet m using (customer_id)
+  where r.last_purchase_ts is not null  -- drop customers with no successful purchases
 ),
 
-scored AS (
-  SELECT
+scored as (
+  select
     customer_id,
     last_purchase_ts,
     frequency,
     monetary,
-    date_diff('day', CAST(last_purchase_ts AS DATE), current_date) AS recency_days,
 
-    -- Recency: smaller is better ⇒ invert NTILE
-    (6 - NTILE(5) OVER (ORDER BY date_diff('day', CAST(last_purchase_ts AS DATE), current_date))) AS r_score,
+    -- Recency in days (portable)
+    {% if target.type == 'redshift' %}
+      datediff(day, cast(last_purchase_ts as date), current_date) as recency_days
+    {% else %}
+      date_diff('day', cast(last_purchase_ts as date), current_date) as recency_days
+    {% endif %},
 
-    -- Frequency & Monetary: larger is better
-    NTILE(5) OVER (ORDER BY frequency) AS f_score,
-    NTILE(5) OVER (ORDER BY monetary)  AS m_score
-  FROM tx
+    -- R: smaller is better → invert NTILE
+    (6 - ntile(5) over (
+       order by
+         {% if target.type == 'redshift' %}
+           datediff(day, cast(last_purchase_ts as date), current_date)
+         {% else %}
+           date_diff('day', cast(last_purchase_ts as date), current_date)
+         {% endif %}
+     )) as r_score,
+
+    -- F & M: larger is better
+    ntile(5) over (order by frequency) as f_score,
+    ntile(5) over (order by monetary)  as m_score
+  from tx
 )
 
-SELECT
+select
   *,
-  (r_score * 100 + f_score * 10 + m_score) AS rfm_code
-FROM scored
+  (r_score * 100 + f_score * 10 + m_score) as rfm_code
+from scored

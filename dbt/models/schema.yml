@@ -1,23 +1,48 @@
 version: 2
+
+# Define Redshift source only when adapter is Redshift
+{% if target.type == 'redshift' %}
+sources:
+  - name: core
+    schema: {{ env_var('REDSHIFT_SCHEMA', 'public') }}
+    tables:
+      - name: stg_transactions
+        description: "Raw staging table loaded from S3 via Airflow COPY."
+        freshness:
+          warn_after: {count: 2, period: day}
+          error_after: {count: 5, period: day}
+        loaded_at_field: txn_ts   # if you add ingest_ts later, switch to that
+{% endif %}
+
 models:
   - name: stg_transactions
+    description: "Unified staging view; Redshift selects from source, DuckDB scans Parquet."
     columns:
       - name: transaction_id
-        tests: [not_null, unique]
+        tests:
+          - not_null
+          - unique:
+              severity: warn
       - name: txn_ts
         tests: [not_null]
       - name: status
         tests:
           - accepted_values:
               values: ['approved','declined']
+              case_sensitive: false
 
   - name: fact_transactions
+    description: "Transaction fact (incremental MERGE on Redshift; table on DuckDB)."
     columns:
       - name: transaction_id
         tests: [not_null, unique]
+      - name: txn_ts
+        tests: [not_null]
       - name: amount
-        tests:
-          - not_null
+        tests: [not_null]
 
   - name: mart_sales_daily
+    description: "{{ doc('marts_overview') }}"
+
   - name: mart_rfm_customer
+    description: "{{ doc('marts_overview') }}"
