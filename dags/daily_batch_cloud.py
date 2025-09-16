@@ -3,9 +3,11 @@ from datetime import datetime
 import os
 from airflow import DAG
 from airflow.operators.bash import BashOperator
+from airflow.operators.python import PythonOperator
 from airflow.providers.amazon.aws.operators.redshift_data import RedshiftDataOperator
 from airflow.models.connection import Connection
 from airflow.models import Variable
+from scripts.build_copy_sqls import build_copy_sqls  # import function
 
 
 # --- Environment Variables ---
@@ -30,6 +32,10 @@ default_args = {
     "retries": 0,
 }
 
+def build_and_push_copy_sqls(**context):
+    sql_list = build_copy_sqls(context["ds"])
+    return sql_list  # XCom return
+
 with DAG(
     dag_id="daily_batch_cloud",
     start_date=datetime(2025, 9, 15),
@@ -37,6 +43,7 @@ with DAG(
     catchup=False,
     default_args=default_args,
     max_active_runs=1,
+    render_template_as_native_obj=True,
     description="M3: seed → spark → S3 → Redshift COPY → dbt (facts incremental + marts)",
     template_searchpath=["/opt/airflow/sql"],
 ) as dag:
@@ -83,7 +90,7 @@ with DAG(
     )
 
     # 4) Create Redshift staging table
-    create_stage = RedshiftDataOperator(
+    create_stg_table = RedshiftDataOperator(
         task_id="create_stg_table",
         aws_conn_id="aws_default",
         database=REDSHIFT_DB,
@@ -91,18 +98,55 @@ with DAG(
         sql="create_stg_transactions.sql",  
     )
 
-    # 
-    copy_stage = RedshiftDataOperator(
-        task_id="redshift_copy_stage",
+    build_copy_sqls = PythonOperator(
+        task_id="build_copy_sqls",
+        python_callable=build_copy_sqls,
+    )
+
+    copy_stg_transactions_3day = RedshiftDataOperator(
+        task_id="copy_stg_transactions_3day",
         aws_conn_id="aws_default",
-        database=REDSHIFT_DB,
-        workgroup_name=REDSHIFT_WORKGROUP,
+        database=Variable.get("REDSHIFT_DB"),
+        workgroup_name=Variable.get("REDSHIFT_WORKGROUP"),
+        sql=[
+            # 1) Truncate first
+            "TRUNCATE TABLE {{ params.schema }}.stg_transactions;",
+
+            # 2) Copy D-2
+            """
+            COPY {{ params.schema }}.stg_transactions
+            FROM 's3://{{ params.bucket }}/silver/transactions/year={{ macros.ds_format(macros.ds_add(ds, -2), "%Y-%m-%d", "%Y") }}/month={{ macros.ds_format(macros.ds_add(ds, -2), "%Y-%m-%d", "%m") }}/day={{ macros.ds_format(macros.ds_add(ds, -2), "%Y-%m-%d", "%d") }}/'
+            IAM_ROLE '{{ params.iam_role_arn }}'
+            FORMAT AS PARQUET
+            STATUPDATE ON
+            COMPUPDATE ON;
+            """,
+
+            # 3) Copy D-1
+            """
+            COPY {{ params.schema }}.stg_transactions
+            FROM 's3://{{ params.bucket }}/silver/transactions/year={{ macros.ds_format(macros.ds_add(ds, -1), "%Y-%m-%d", "%Y") }}/month={{ macros.ds_format(macros.ds_add(ds, -1), "%Y-%m-%d", "%m") }}/day={{ macros.ds_format(macros.ds_add(ds, -1), "%Y-%m-%d", "%d") }}/'
+            IAM_ROLE '{{ params.iam_role_arn }}'
+            FORMAT AS PARQUET
+            STATUPDATE ON
+            COMPUPDATE ON;
+            """,
+
+            # 4) Copy D (today)
+            """
+            COPY {{ params.schema }}.stg_transactions
+            FROM 's3://{{ params.bucket }}/silver/transactions/year={{ ds[:4] }}/month={{ ds[5:7] }}/day={{ ds[8:10] }}/'
+            IAM_ROLE '{{ params.iam_role_arn }}'
+            FORMAT AS PARQUET
+            STATUPDATE ON
+            COMPUPDATE ON;
+            """,
+        ],
         params={
             "schema": REDSHIFT_SCHEMA,
-            "iam_role": REDSHIFT_IAM_ROLE_ARN,
-            "s3_bucket": S3_BUCKET 
+            "bucket": S3_BUCKET,
+            "iam_role_arn": REDSHIFT_IAM_ROLE_ARN,
         },
-        sql="copy_stg_transactions.sql",
     )
 
     # 4) dbt: facts (incremental MERGE) — dbt owns the fact table
@@ -130,5 +174,5 @@ with DAG(
     )
 
     # Final task order
-    seed_for_day >> spark_clean_for_day >> sync_silver_to_s3 >> create_stage >> copy_stage >> dbt_run_facts >> dbt_run_marts
+    seed_for_day >> spark_clean_for_day >> sync_silver_to_s3 >> create_stg_table >> copy_stg_transactions_3day >> dbt_run_facts >> dbt_run_marts
 
