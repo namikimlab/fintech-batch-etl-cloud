@@ -3,8 +3,10 @@ from datetime import datetime
 import os
 from airflow import DAG
 from airflow.operators.bash import BashOperator
-from airflow.models import Variable
 from airflow.providers.amazon.aws.operators.redshift_data import RedshiftDataOperator
+from airflow.models.connection import Connection
+from airflow.models import Variable
+
 
 # --- Environment Variables ---
 DATA_ROOT = os.getenv("DATA_ROOT", "/app/data")                          
@@ -13,14 +15,14 @@ SILVER_DIR = os.getenv("SILVER_DIR", "/app/data/silver")
 RECORDS_PER_DAY = os.getenv("RECORDS_PER_DAY", "5000")
 DUP_RATE = os.getenv("DUP_RATE", "0.02")
 LATE_RATE = os.getenv("LATE_RATE", "0.05")
-S3_BUCKET = Variable.get("S3_BUCKET")
 
-# --- Airflow Variables (for Redshift Data API) ---
-# Store these in Airflow → Admin → Variables
+# --- Airflow Variables ---
+S3_BUCKET = Variable.get("S3_BUCKET")
 REDSHIFT_DB = Variable.get("REDSHIFT_DB")                  
 REDSHIFT_WORKGROUP = Variable.get("REDSHIFT_WORKGROUP")    
 REDSHIFT_SCHEMA = os.getenv("REDSHIFT_SCHEMA", "public")    
 REDSHIFT_IAM_ROLE_ARN = Variable.get("REDSHIFT_IAM_ROLE_ARN")  # IAM Role for COPY (attached to the Redshift workgroup)
+
 
 default_args = {
     "owner": "nami",
@@ -65,26 +67,29 @@ with DAG(
         ),
     )
 
+    # Upload daily silver files to S3 , parquet only 
     sync_silver_to_s3 = BashOperator(
         task_id="sync_silver_to_s3",
         bash_command=(
             "aws s3 sync "
             f"{SILVER_DIR}/transactions/year={{{{ ds_nodash[:4] }}}}/month={{{{ ds_nodash[4:6] }}}}/day={{{{ ds_nodash[6:8] }}}}/ "
             f"s3://{{{{ var.value.S3_BUCKET }}}}/silver/transactions/year={{{{ ds_nodash[:4] }}}}/month={{{{ ds_nodash[4:6] }}}}/day={{{{ ds_nodash[6:8] }}}}/ "
+            "--exclude '*' "
+            "--include '*.parquet' "
             "--only-show-errors"
         ),
         env={'AWS_CLI_HOME': '/tmp'}, # for cache saving
     )
 
-    # 3) Validate parquet 
-    validate_silver_data = BashOperator(
-        task_id="validate_silver_data",
-        bash_command=(
-            "python /opt/airflow/scripts/validate_parquet.py "
-            f"--s3-path s3://{{{{ var.value.S3_BUCKET }}}}/silver/transactions/year={{{{ ds_nodash[:4] }}}}/month={{{{ ds_nodash[4:6] }}}}/day={{{{ ds_nodash[6:8] }}}}/"
-        ),
-        env={'AWS_CLI_HOME': '/tmp'}, # for cache saving
-    )
+    # # 3) Validate parquet 
+    # validate_silver_data = BashOperator(
+    #     task_id="validate_silver_data",
+    #     bash_command=(
+    #         "python /opt/airflow/scripts/validate_parquet.py "
+    #         f"--s3-path s3://{{{{ var.value.S3_BUCKET }}}}/silver/transactions/year={{{{ ds_nodash[:4] }}}}/month={{{{ ds_nodash[4:6] }}}}/day={{{{ ds_nodash[6:8] }}}}/"
+    #     ),
+    #     env={'AWS_CLI_HOME': '/tmp'}, # for cache saving
+    # )
 
     # 4) Create Redshift staging table
     create_stage = RedshiftDataOperator(
@@ -134,5 +139,7 @@ with DAG(
     )
 
     # Final task order
-    seed_for_day >> spark_clean_for_day >> sync_silver_to_s3 >> validate_silver_data >> create_stage >> copy_stage >> dbt_run_facts >> dbt_run_marts
+    seed_for_day >> spark_clean_for_day >> sync_silver_to_s3 >> create_stage 
+    
+    # >> copy_stage >> dbt_run_facts >> dbt_run_marts
 

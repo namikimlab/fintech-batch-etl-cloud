@@ -7,5 +7,3 @@ COPY {{ params.schema }}.stg_transactions
 FROM 's3://{{ params.s3_bucket }}/silver/transactions/'
 IAM_ROLE '{{ params.iam_role }}'
 FORMAT AS PARQUET
-REGION '{{ params.region }}' -- Add your AWS region
-;
