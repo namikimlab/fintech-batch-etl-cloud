@@ -1,17 +1,11 @@
--- /opt/airflow/sql/copy_stg_transactions.sql
+-- Truncate the table to clear old data
 TRUNCATE TABLE {{ params.schema }}.stg_transactions;
 
+-- Copy all data from the partitioned S3 directory.
+-- Redshift will automatically scan all year=YYYY/month=MM/day=DD sub-folders.
 COPY {{ params.schema }}.stg_transactions
-FROM 's3://{{ params.s3_bucket }}/silver/transactions/year={{ ds_nodash[:4] }}/month={{ ds_nodash[4:6] }}/day={{ ds_nodash[6:8] }}/'
+FROM 's3://{{ params.s3_bucket }}/silver/transactions/'
 IAM_ROLE '{{ params.iam_role }}'
-FORMAT AS PARQUET;
-
-COPY {{ params.schema }}.stg_transactions
-FROM 's3://{{ params.s3_bucket }}/silver/transactions/year={{ (execution_date - macros.timedelta(days=1)).strftime("%Y") }}/month={{ (execution_date - macros.timedelta(days=1)).strftime("%m") }}/day={{ (execution_date - macros.timedelta(days=1)).strftime("%d") }}/'
-IAM_ROLE '{{ params.iam_role }}'
-FORMAT AS PARQUET;
-
-COPY {{ params.schema }}.stg_transactions
-FROM 's3://{{ params.s3_bucket }}/silver/transactions/year={{ (execution_date - macros.timedelta(days=2)).strftime("%Y") }}/month={{ (execution_date - macros.timedelta(days=2)).strftime("%m") }}/day={{ (execution_date - macros.timedelta(days=2)).strftime("%d") }}/'
-IAM_ROLE '{{ params.iam_role }}'
-FORMAT AS PARQUET;
+FORMAT AS PARQUET
+REGION '{{ params.region }}' -- Add your AWS region
+;

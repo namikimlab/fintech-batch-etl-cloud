@@ -20,7 +20,7 @@ S3_BUCKET = Variable.get("S3_BUCKET")
 REDSHIFT_DB = Variable.get("REDSHIFT_DB")                  
 REDSHIFT_WORKGROUP = Variable.get("REDSHIFT_WORKGROUP")    
 REDSHIFT_SCHEMA = os.getenv("REDSHIFT_SCHEMA", "public")    
-REDSHIFT_IAM_ROLE_ARN = os.getenv("REDSHIFT_IAM_ROLE_ARN")  # IAM Role for COPY (attached to the Redshift workgroup)
+REDSHIFT_IAM_ROLE_ARN = Variable.get("REDSHIFT_IAM_ROLE_ARN")  # IAM Role for COPY (attached to the Redshift workgroup)
 
 default_args = {
     "owner": "nami",
@@ -34,7 +34,7 @@ with DAG(
     catchup=False,
     default_args=default_args,
     max_active_runs=1,
-    description="M3 (Option B): seed → spark(S3) → Redshift COPY → dbt (facts incremental + marts)",
+    description="M3: seed → spark(S3) → Redshift COPY → dbt (facts incremental + marts)",
     render_template_as_native_obj=True,
     # Put your SQL template files under this folder in the container
     template_searchpath=["/opt/airflow/sql"],
@@ -73,10 +73,29 @@ with DAG(
             f"s3://{{{{ var.value.S3_BUCKET }}}}/silver/transactions/year={{{{ ds_nodash[:4] }}}}/month={{{{ ds_nodash[4:6] }}}}/day={{{{ ds_nodash[6:8] }}}}/ "
             "--only-show-errors"
         ),
-        env={'AWS_CLI_HOME': '/tmp'},
+        env={'AWS_CLI_HOME': '/tmp'}, # for cache saving
     )
 
-    # 3) Redshift: ensure staging exists, truncate, then COPY D, D-1, D-2
+    # 3) Validate parquet 
+    validate_silver_data = BashOperator(
+        task_id="validate_silver_data",
+        bash_command=(
+            "python /opt/airflow/scripts/validate_parquet.py "
+            f"--s3-path s3://{{{{ var.value.S3_BUCKET }}}}/silver/transactions/year={{{{ ds_nodash[:4] }}}}/month={{{{ ds_nodash[4:6] }}}}/day={{{{ ds_nodash[6:8] }}}}/"
+        ),
+        env={'AWS_CLI_HOME': '/tmp'}, # for cache saving
+    )
+
+    # 4) Create Redshift staging table
+    create_stage = RedshiftDataOperator(
+        task_id="create_stg_table",
+        aws_conn_id="aws_default",
+        database=REDSHIFT_DB,
+        workgroup_name=REDSHIFT_WORKGROUP,
+        sql="create_stg_transactions.sql",  
+    )
+
+    # 
     copy_stage = RedshiftDataOperator(
         task_id="redshift_copy_stage",
         aws_conn_id="aws_default",
@@ -85,7 +104,7 @@ with DAG(
         params={
             "schema": REDSHIFT_SCHEMA,
             "iam_role": REDSHIFT_IAM_ROLE_ARN,
-            "s3_bucket": S3_BUCKET # Pass the variable to params
+            "s3_bucket": S3_BUCKET 
         },
         sql="copy_stg_transactions.sql",
     )
@@ -115,5 +134,5 @@ with DAG(
     )
 
     # Final task order
-    seed_for_day >> spark_clean_for_day >> sync_silver_to_s3 >> copy_stage >> dbt_run_facts >> dbt_run_marts
+    seed_for_day >> spark_clean_for_day >> sync_silver_to_s3 >> validate_silver_data >> create_stage >> copy_stage >> dbt_run_facts >> dbt_run_marts
 

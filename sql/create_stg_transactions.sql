@@ -1,12 +1,17 @@
-CREATE TABLE IF NOT EXISTS {{ params.schema }}.stg_transactions (
-  transaction_id VARCHAR(64),
-  customer_id    VARCHAR(64),
-  card_id        VARCHAR(64),
-  merchant_id    VARCHAR(64),
-  txn_ts         TIMESTAMP,
-  amount         DECIMAL(18,2),
-  mcc            VARCHAR(8),
-  status         VARCHAR(16),
-  is_refund      BOOLEAN,
-  channel        VARCHAR(16)
+CREATE TABLE IF NOT EXISTS public.stg_transactions (
+    transaction_id VARCHAR(256),
+    customer_id VARCHAR(256),
+    card_id VARCHAR(256),
+    merchant_id VARCHAR(256),
+    txn_ts TIMESTAMP,
+    amount DECIMAL(18, 2),
+    currency VARCHAR(10),
+    mcc VARCHAR(10),
+    status VARCHAR(50),
+    is_refund BOOLEAN,
+    channel VARCHAR(50),
+    ingest_ts TIMESTAMP,
+    year SMALLINT,
+    month VARCHAR(2),
+    day VARCHAR(2)
 );
