@@ -17,10 +17,10 @@ fintech_redshift:
       host: "{{ env_var('REDSHIFT_HOST') }}"
       user: "{{ env_var('REDSHIFT_USER') }}"
       password: "{{ env_var('REDSHIFT_PASSWORD') }}"
-      port: "{{ env_var('REDSHIFT_PORT', '5439') }}"
+      port: "{{ env_var('REDSHIFT_PORT', 5439) | int }}"
       dbname: "{{ env_var('REDSHIFT_DB') }}"
       schema: "{{ env_var('REDSHIFT_SCHEMA', 'public') }}"
       threads: 4
       keepalives_idle: 0
-      connect_timeout: 10
+      connect_timeout: 120
       retries: 1

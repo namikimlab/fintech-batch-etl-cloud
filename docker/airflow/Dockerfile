@@ -11,6 +11,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
       procps \
       curl \
       unzip \
+      git \
     && rm -rf /var/lib/apt/lists/*
 
 # --- Install AWS CLI v2 ---

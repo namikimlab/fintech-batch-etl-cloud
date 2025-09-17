@@ -1,10 +1,8 @@
 version: 2
 
-# Define Redshift source only when adapter is Redshift
-{% if target.type == 'redshift' %}
 sources:
   - name: core
-    schema: {{ env_var('REDSHIFT_SCHEMA', 'public') }}
+    schema: "{{ env_var('REDSHIFT_SCHEMA', 'public') }}"
     tables:
       - name: stg_transactions
         description: "Raw staging table loaded from S3 via Airflow COPY."
@@ -12,7 +10,6 @@ sources:
           warn_after: {count: 2, period: day}
           error_after: {count: 5, period: day}
         loaded_at_field: txn_ts   # if you add ingest_ts later, switch to that
-{% endif %}
 
 models:
   - name: stg_transactions
@@ -29,7 +26,6 @@ models:
         tests:
           - accepted_values:
               values: ['approved','declined']
-              case_sensitive: false
 
   - name: fact_transactions
     description: "Transaction fact (incremental MERGE on Redshift; table on DuckDB)."

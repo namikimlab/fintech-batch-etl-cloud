@@ -1,3 +1,4 @@
+{% docs marts_overview %}
 # Analytics Marts (Gold Layer)
 
 **Scope:** dbt owns **all transformations**. Airflow only orchestrates upstream steps (seed → Spark → S3 silver → Redshift COPY to `stg_transactions`) and then calls dbt for facts+marts.
@@ -114,4 +115,4 @@ dbt run --profile fintech_duckdb --target dev \
 * Add exposures for dashboards that consume `mart_sales_daily` and `mart_rfm_customer`.
 * Add Great Expectations or Elementary for richer observability alongside dbt tests.
 
-
+{% enddocs %}

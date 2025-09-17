@@ -116,23 +116,28 @@ with DAG(
     dbt_run_facts = BashOperator(
         task_id="dbt_run_facts",
         bash_command=(
-            "set -euo pipefail && "
-            "cd /opt/dbt/project && "
-            "dbt deps && "
-            "dbt run --profiles-dir /opt/dbt/profiles --target redshift "
-            "--select path:models/facts "
-            "--vars '{process_date: {{ ds }}}'"
+            'set -euo pipefail && '
+            'cd /opt/airflow/dbt && '
+            'dbt deps && '
+            'dbt debug --profiles-dir /opt/dbt/profiles --target redshift && '
+            'dbt build --profiles-dir /opt/dbt/profiles --target redshift '
+            '--select path:models/facts '
+            '--fail-fast '
+            '--vars \'{"process_date": "{{ ds }}"}\''
         ),
     )
+
 
     # 5) dbt: marts (gold)
     dbt_run_marts = BashOperator(
         task_id="dbt_run_marts",
         bash_command=(
-            "set -euo pipefail && "
-            "cd /opt/dbt/project && "
-            "dbt run --profiles-dir /opt/dbt/profiles --target redshift "
-            "--select path:models/marts"
+            'set -euo pipefail && '
+            'cd /opt/airflow/dbt && '
+            'dbt debug --profiles-dir /opt/dbt/profiles --target redshift && '
+            'dbt build --profiles-dir /opt/dbt/profiles --target redshift '
+            '--select path:models/marts '
+            '--fail-fast'
         ),
     )
 
