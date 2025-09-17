@@ -119,8 +119,8 @@ with DAG(
             'set -euo pipefail && '
             'cd /opt/airflow/dbt && '
             'dbt deps && '
-            'dbt debug --profiles-dir /opt/dbt/profiles --target redshift && '
-            'dbt build --profiles-dir /opt/dbt/profiles --target redshift '
+            'dbt debug --profiles-dir /opt/airflow/dbt --target dev && '
+            'dbt build --profiles-dir /opt/airflow/dbt --target dev '
             '--select path:models/facts '
             '--fail-fast '
             '--vars \'{"process_date": "{{ ds }}"}\''
@@ -134,8 +134,8 @@ with DAG(
         bash_command=(
             'set -euo pipefail && '
             'cd /opt/airflow/dbt && '
-            'dbt debug --profiles-dir /opt/dbt/profiles --target redshift && '
-            'dbt build --profiles-dir /opt/dbt/profiles --target redshift '
+            'dbt debug --profiles-dir /opt/airflow/dbt --target dev && '
+            'dbt build --profiles-dir /opt/airflow/dbt --target dev '
             '--select path:models/marts '
             '--fail-fast'
         ),
