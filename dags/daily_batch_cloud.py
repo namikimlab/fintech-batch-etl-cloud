@@ -7,7 +7,7 @@ from airflow.operators.python import PythonOperator
 from airflow.providers.amazon.aws.operators.redshift_data import RedshiftDataOperator
 from airflow.models.connection import Connection
 from airflow.models import Variable
-from scripts.build_copy_sqls import build_copy_sqls  # import function
+from scripts.build_copy_sqls import build_copy_sqls as build_copy_sqls_fn  # import function
 
 
 # --- Environment Variables ---
@@ -32,9 +32,10 @@ default_args = {
     "retries": 0,
 }
 
+# Helper function to build 3 days COPY without error for missing days 
 def build_and_push_copy_sqls(**context):
-    sql_list = build_copy_sqls(context["ds"])
-    return sql_list  # XCom return
+    sql_list = build_copy_sqls_fn(context["ds"])
+    return sql_list  # this goes into XCom and can be pulled later
 
 with DAG(
     dag_id="daily_batch_cloud",
@@ -100,53 +101,15 @@ with DAG(
 
     build_copy_sqls = PythonOperator(
         task_id="build_copy_sqls",
-        python_callable=build_copy_sqls,
+        python_callable=build_and_push_copy_sqls,  # <-- call the wrapper
     )
 
     copy_stg_transactions_3day = RedshiftDataOperator(
         task_id="copy_stg_transactions_3day",
         aws_conn_id="aws_default",
-        database=Variable.get("REDSHIFT_DB"),
-        workgroup_name=Variable.get("REDSHIFT_WORKGROUP"),
-        sql=[
-            # 1) Truncate first
-            "TRUNCATE TABLE {{ params.schema }}.stg_transactions;",
-
-            # 2) Copy D-2
-            """
-            COPY {{ params.schema }}.stg_transactions
-            FROM 's3://{{ params.bucket }}/silver/transactions/year={{ macros.ds_format(macros.ds_add(ds, -2), "%Y-%m-%d", "%Y") }}/month={{ macros.ds_format(macros.ds_add(ds, -2), "%Y-%m-%d", "%m") }}/day={{ macros.ds_format(macros.ds_add(ds, -2), "%Y-%m-%d", "%d") }}/'
-            IAM_ROLE '{{ params.iam_role_arn }}'
-            FORMAT AS PARQUET
-            STATUPDATE ON
-            COMPUPDATE ON;
-            """,
-
-            # 3) Copy D-1
-            """
-            COPY {{ params.schema }}.stg_transactions
-            FROM 's3://{{ params.bucket }}/silver/transactions/year={{ macros.ds_format(macros.ds_add(ds, -1), "%Y-%m-%d", "%Y") }}/month={{ macros.ds_format(macros.ds_add(ds, -1), "%Y-%m-%d", "%m") }}/day={{ macros.ds_format(macros.ds_add(ds, -1), "%Y-%m-%d", "%d") }}/'
-            IAM_ROLE '{{ params.iam_role_arn }}'
-            FORMAT AS PARQUET
-            STATUPDATE ON
-            COMPUPDATE ON;
-            """,
-
-            # 4) Copy D (today)
-            """
-            COPY {{ params.schema }}.stg_transactions
-            FROM 's3://{{ params.bucket }}/silver/transactions/year={{ ds[:4] }}/month={{ ds[5:7] }}/day={{ ds[8:10] }}/'
-            IAM_ROLE '{{ params.iam_role_arn }}'
-            FORMAT AS PARQUET
-            STATUPDATE ON
-            COMPUPDATE ON;
-            """,
-        ],
-        params={
-            "schema": REDSHIFT_SCHEMA,
-            "bucket": S3_BUCKET,
-            "iam_role_arn": REDSHIFT_IAM_ROLE_ARN,
-        },
+        database=REDSHIFT_DB,
+        workgroup_name=REDSHIFT_WORKGROUP,
+        sql="{{ ti.xcom_pull(task_ids='build_copy_sqls') }}",  # gets the list
     )
 
     # 4) dbt: facts (incremental MERGE) — dbt owns the fact table
@@ -174,5 +137,5 @@ with DAG(
     )
 
     # Final task order
-    seed_for_day >> spark_clean_for_day >> sync_silver_to_s3 >> create_stg_table >> copy_stg_transactions_3day >> dbt_run_facts >> dbt_run_marts
+    seed_for_day >> spark_clean_for_day >> sync_silver_to_s3 >> create_stg_table >>  build_copy_sqls >> copy_stg_transactions_3day >> dbt_run_facts >> dbt_run_marts
 

@@ -30,8 +30,6 @@ def build_copy_sqls(ds: str):
             FROM 's3://{bucket}/{prefix}'
             IAM_ROLE '{iam_role}'
             FORMAT AS PARQUET
-            STATUPDATE ON
-            COMPUPDATE ON;
             """)
         else:
             print(f"[SKIP] No objects under s3://{bucket}/{prefix}")

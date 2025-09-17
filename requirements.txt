@@ -2,6 +2,7 @@
 pyspark==3.5.2   # For Spark jobs
 faker            # For synthetic data generation in faker_seed.py
 pyarrow
+pandas
 
 # dbt stack 
 dbt-core

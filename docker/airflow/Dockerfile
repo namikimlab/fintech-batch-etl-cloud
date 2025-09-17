@@ -25,6 +25,9 @@ RUN mkdir -p /tmp/.aws/cli/cache
 # --- Back to airflow user ---
 USER airflow
 
+# --- Set Python path so Airflow can import from /opt/airflow/scripts ---
+ENV PYTHONPATH="${PYTHONPATH}:/opt/airflow"
+
 # --- Airflow constraints: match Airflow 2.10.2 + Python 3.12 ---
 ARG PYVER=3.12
 ARG CONSTRAINTS_URL="https://raw.githubusercontent.com/apache/airflow/constraints-2.10.2/constraints-${PYVER}.txt"

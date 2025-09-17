@@ -21,7 +21,7 @@ x-airflow-common: &airflow-common
     - ./jobs:/opt/airflow/jobs
     - ./dbt:/opt/airflow/dbt
     - ./data/duckdb:/opt/dbt/duckdb
-    - ~/.aws:/home/airflow/.aws:ro
+    - ~/.aws:/home/airflow/.aws:rw
     - ./sql:/opt/airflow/sql
   user: "${AIRFLOW_UID}:0"
   depends_on:

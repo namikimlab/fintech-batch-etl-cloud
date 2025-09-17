@@ -75,7 +75,9 @@ def main():
             w = csv.DictWriter(f, fieldnames=list(rows[0].keys()))
             w.writeheader(); w.writerows(rows)
 
-        print(f"Wrote {len(rows)} rows to {out_fp}")
+        print(f"Write complete")
+        print(f"Number of rows={len(rows)}, Number of columns={len(rows[0].keys())}")
+        print(f"Output file={out_fp}")
 
 if __name__ == "__main__":
     main()

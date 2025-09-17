@@ -113,6 +113,7 @@ def main():
     print(f"silver_path={out}")
     print(f"process_date={args.process_date} lookback_days={args.lookback_days}")
     print(f"rows={total} distinct_txn_id={distinct_ids} apparent_dup_rate={dup_rate:.6f}")
+    print(f"num_columns={len(to_write.columns)}")
     print(f"impacted_partitions_count={len(impacted_dates)}")
     print(f"impacted_partitions_preview={impacted_preview}")
 
