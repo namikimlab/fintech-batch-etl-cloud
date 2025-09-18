@@ -15,3 +15,6 @@ apache-airflow-providers-postgres
 
 # PG driver
 psycopg2==2.9.10
+
+great_expectations
+great_expectations[spark]

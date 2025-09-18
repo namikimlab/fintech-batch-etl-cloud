@@ -23,6 +23,7 @@ x-airflow-common: &airflow-common
     - ./data/duckdb:/opt/dbt/duckdb
     - ~/.aws:/home/airflow/.aws:rw
     - ./sql:/opt/airflow/sql
+    - ./great_expectations:/opt/airflow/great_expectations
   user: "${AIRFLOW_UID}:0"
   depends_on:
     postgres:
