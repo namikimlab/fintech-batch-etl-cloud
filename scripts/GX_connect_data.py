@@ -35,6 +35,7 @@ context = gx.get_context(
     project_root_dir="/opt/airflow/great_expectations",  
 )
 
+
 # 2) Check if datasources exist 
 # if not, Add a Spark datasource rooted at the partition tree
 try:
@@ -46,6 +47,7 @@ except LookupError:
         name="silver",
         base_directory="/app/data/silver/transactions",
     )
+print(f"✅ Datasource '{ds.name}' registered.")
 
 # 3) Check if asset exist 
 # if not, add a Directory Parquet asset: points at the folder that holds all partitions
@@ -61,10 +63,8 @@ except LookupError:
         pathGlobFilter="**/*.parquet",       # only parquet files
     )
 
-print(type(asset))
-print(f"✅ Datasource '{ds.name}' registered.")
-print(f"✅ Asset '{asset.name}' registered.")
-print("Check your great_expectations.yml to confirm.")
+print(f"✅ Asset type {type(asset)} registered.")
+print(f"✅ Asset'{asset.name}' registered.")
 
 # 4) Check if batch definition exists, if not, add it
 try:
@@ -77,7 +77,8 @@ except KeyError:
         column="txn_ts"
     )
 
-# Validate 
-print("✅ Validating batch definition.")
-batch = batch_definition.get_batch(batch_parameters={"year": 2025, "month": 9, "day": 16})
-print(batch.head())
+print(f"✅ Batch definition'{batch_definition.name}' registered.")
+# # Validate 
+# print("✅ Validating batch definition.")
+# batch = batch_definition.get_batch(batch_parameters={"year": 2025, "month": 9, "day": 16})
+# print(batch.head())
