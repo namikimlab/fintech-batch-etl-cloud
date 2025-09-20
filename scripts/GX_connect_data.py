@@ -63,7 +63,7 @@ except LookupError:
         pathGlobFilter="**/*.parquet",       # only parquet files
     )
 
-print(f"✅ Asset type {type(asset)} registered.")
+print(f"✅ Asset type {type(asset)}")
 print(f"✅ Asset'{asset.name}' registered.")
 
 # 4) Check if batch definition exists, if not, add it

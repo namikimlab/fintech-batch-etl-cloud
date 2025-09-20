@@ -63,6 +63,8 @@ def get_days_to_generate(for_date: Optional[str], days: int) -> List[datetime.da
     Returns:
         A list of dates to generate data for.
     """
+    # If a specific date is provided, use it. Otherwise, generate a list of dates
+    # for the last 'days' number of days, ending with the current day.
     if for_date:
         return [datetime.strptime(for_date, "%Y-%m-%d").date()]
     else:
