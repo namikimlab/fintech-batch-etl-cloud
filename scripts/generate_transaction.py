@@ -3,22 +3,22 @@ Generates fake transaction data and saves it to a CSV files.
 The data includes duplicates and late-arriving data to simulate real-world scenarios.
 
 Arguments to be passed to the script:
---logical-date (required)
-    The logical date for the generated transactions, in YYYY-MM-DD format.
+--today (required)
+    The date for the generated transactions, in YYYY-MM-DD format.
     Example: 2025-09-20
 
 --num-transactions (optional, default=1000)
-    Number of transactions to generate for the given logical date.
+    Number of transactions to generate for the given date.
     Example: --num-transactions 5000
 
---late-arrival-ratio (optional, default=0.1)
+--late-rate (optional, default=0.1)
     Fraction of generated transactions to mark as "late arrivals" 
     (i.e., they will have timestamps offset by up to 2 days earlier or later).
-    Example: --late-arrival-ratio 0.15  # 15% late arrivals
+    Example: --late-late 0.15  # 15% late arrivals
 
---duplicate-ratio (optional, default=0.05)
+--dup-rate (optional, default=0.05)
     Fraction of transactions to duplicate (simulating duplicates in raw data).
-    Example: --duplicate-ratio 0.1  # 10% duplicates
+    Example: --dup-rate 0.1  # 10% duplicates
 
 --output-dir (optional, default="./data/bronze")
     Directory where the output CSV file will be written.
@@ -32,12 +32,12 @@ from datetime import datetime, timedelta
 import argparse
 import os
 
-def create_transaction(logical_date: datetime):
+def create_transaction(today: datetime):
     """Creates a single synthetic transaction for a given date"""
     
-    # Generate a random timestamp within the 24-hour window of the logical date
+    # Generate a random timestamp within the 24-hour window of the given date
     seconds_in_day = 24 * 60 * 60  # 86400 seconds
-    transaction_timestamp = logical_date + timedelta(seconds=random.randint(0, seconds_in_day - 1))
+    transaction_timestamp = today + timedelta(seconds=random.randint(0, seconds_in_day - 1))
 
     # Simulate a small merchant pool for repeatable joins
     merchant_id = f"MER{random.randint(1000, 1020)}"  # 21 merchants
@@ -57,9 +57,9 @@ def create_transaction(logical_date: datetime):
         "channel": random.choice(["online", "pos", "mobile"]),
     }
 
-def generate_transactions_for_date(num_transactions: int, logical_date: datetime):
+def generate_transactions_for_date(num_transactions: int, today: datetime):
     """Generates a list of transactions for a specific date."""
-    return [create_transaction(logical_date) for _ in range(num_transactions)]
+    return [create_transaction(today) for _ in range(num_transactions)]
 
 def read_transactions_from_file(file_path: str):
     """Reads transactions from a CSV file."""
@@ -74,19 +74,19 @@ def read_transactions_from_file(file_path: str):
         print(f"Error reading {file_path}: {e}")
         return []
 
-def inject_late_arrivals(transactions: list, late_arrival_ratio: float, logical_date: datetime, source_dir: str):
+def inject_late_arrivals(transactions: list, late_rate: float, today: datetime, source_dir: str):
     """Injects late-arriving transactions from D-1 and D-2 by reading from existing files."""
-    if late_arrival_ratio == 0:
+    if late_rate == 0:
         return transactions
 
-    num_late_arrivals = int(len(transactions) * late_arrival_ratio)
+    num_late_arrivals = int(len(transactions) * late_rate)
     if num_late_arrivals == 0:
         return transactions
 
     potential_late_arrivals = []
     for days_ago in [1, 2]:
-        past_date = logical_date - timedelta(days=days_ago)
-        file_path = os.path.join(source_dir, f"transactions_={past_date.strftime('%Y-%m-%d')}.csv")
+        past_date = today - timedelta(days=days_ago)
+        file_path = os.path.join(source_dir, f"transactions_{past_date.strftime('%Y-%m-%d')}.csv")
         potential_late_arrivals.extend(read_transactions_from_file(file_path))
 
     if not potential_late_arrivals:
@@ -100,12 +100,12 @@ def inject_late_arrivals(transactions: list, late_arrival_ratio: float, logical_
     
     return transactions + late_arrivals
 
-def inject_duplicates(transactions: list, duplicate_ratio: float):
+def inject_duplicates(transactions: list, dup_rate: float):
     """Injects duplicate transactions."""
-    if duplicate_ratio == 0:
+    if dup_rate == 0:
         return transactions
         
-    num_duplicates = int(len(transactions) * duplicate_ratio)
+    num_duplicates = int(len(transactions) * dup_rate)
     if num_duplicates == 0:
         return transactions
 
@@ -146,38 +146,38 @@ def write_to_csv(transactions: list, output_path: str):
 def main():
     parser = argparse.ArgumentParser(description="Generate synthetic transaction data.")
     
-    parser.add_argument("--logical-date", required=True, help="The logical date for the transaction data in YYYY-MM-DD format.")
+    parser.add_argument("--today", required=True, help="The date for the transaction data in YYYY-MM-DD format.")
     
-    parser.add_argument("--num-transactions", type=int, default=1000, help="Number of transactions to generate for the logical date.")
+    parser.add_argument("--num-transactions", type=int, default=1000, help="Number of transactions to generate for the date.")
     
-    parser.add_argument("--late-arrival-ratio", type=float, default=0.1, help="Ratio of late-arriving transactions to inject.")
+    parser.add_argument("--late-rate", type=float, default=0.1, help="Ratio of late-arriving transactions to inject.")
     
-    parser.add_argument("--duplicate-ratio", type=float, default=0.05, help="Ratio of duplicate transactions to inject.")
+    parser.add_argument("--dup-rate", type=float, default=0.05, help="Ratio of duplicate transactions to inject.")
     
     parser.add_argument("--output-dir", default="./app/data/bronze", help="Directory to save the output CSV file.")
     
     args = parser.parse_args()
 
     try:
-        logical_date = datetime.strptime(args.logical_date, "%Y-%m-%d")
+        today = datetime.strptime(args.today, "%Y-%m-%d")
     except ValueError:
-        print("Error: Please provide the logical date in YYYY-MM-DD format.")
+        print("Error: Please provide the date in YYYY-MM-DD format.")
         return
 
     # 1. Generate Today's Data
-    print(f"Generating {args.num_transactions} transactions for {args.logical_date}...")
-    daily_transactions = generate_transactions_for_date(args.num_transactions, logical_date)
+    print(f"Generating {args.num_transactions} transactions for {args.today}...")
+    daily_transactions = generate_transactions_for_date(args.num_transactions, today)
 
     # 2. Inject Late Arrivals
-    print(f"Injecting {args.late_arrival_ratio * 100}% late arrivals...")
-    transactions_with_late_arrivals = inject_late_arrivals(daily_transactions, args.late_arrival_ratio, logical_date, args.output_dir)
+    print(f"Injecting {args.late_rate * 100}% late arrivals...")
+    transactions_with_late_arrivals = inject_late_arrivals(daily_transactions, args.late_rate, today, args.output_dir)
 
     # 3. Inject Duplicates
-    print(f"Injecting {args.duplicate_ratio * 100}% duplicates...")
-    final_transactions = inject_duplicates(transactions_with_late_arrivals, args.duplicate_ratio)
+    print(f"Injecting {args.dup_rate * 100}% duplicates...")
+    final_transactions = inject_duplicates(transactions_with_late_arrivals, args.dup_rate)
     
     # 4. Write Daily CSV
-    output_filename = f"transactions_{args.logical_date}.csv"
+    output_filename = f"transactions_{args.today}.csv"
     output_path = os.path.join(args.output_dir, output_filename)
     
     os.makedirs(args.output_dir, exist_ok=True)
