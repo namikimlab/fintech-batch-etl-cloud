@@ -1,121 +1,236 @@
-# PySpark transform (local mode). Reads a rolling bronze window -> dedup (newest arrival wins)
-# -> writes only impacted txn_date partitions (Parquet) to silver.
-# English comments by default.
-import argparse, os
+"""
+PySpark script for cleaning transaction data.
+
+This script reads a rolling window of transaction data from a bronze layer,
+deduplicates it based on the latest arrival timestamp, and writes the cleaned
+data to a silver layer, partitioned by transaction date.
+
+The process is designed to be idempotent and handles late-arriving data
+by reprocessing a configurable lookback window.
+"""
+import argparse
+import os
 from datetime import datetime, timedelta
-from pyspark.sql import SparkSession, functions as F, Window
+from typing import List, Tuple, Optional
+from pyspark.sql import SparkSession, Window, DataFrame
+from pyspark.sql import functions as F, types as T
 
-def parse_args():
-    ap = argparse.ArgumentParser()
-    ap.add_argument("--bronze-dir", type=str, required=True, help="e.g., /app/data/bronze")
-    ap.add_argument("--silver-dir", type=str, required=True, help="e.g., /app/data/silver")
-    ap.add_argument("--process-date", type=str, required=True, help="YYYY-MM-DD (logical run date)")
-    ap.add_argument("--lookback-days", type=int, default=2, help="Read D, D-1, ..., D-lookback from bronze")
-    ap.add_argument("--preview", type=int, default=10, help="How many impacted partitions to print in logs")
-    return ap.parse_args()
 
-def build_ingest_paths(bronze_dir, process_date_str, lookback_days):
-    d = datetime.strptime(process_date_str, "%Y-%m-%d").date()
-    dates = [(d - timedelta(days=i)).isoformat() for i in range(lookback_days, -1, -1)]
-    base = os.path.join(bronze_dir, "transactions")
-    paths = [os.path.join(base, f"ingest_date={ds}") for ds in dates]
-    # Keep only existing folders to avoid Spark errors
-    return [p for p in paths if os.path.isdir(p)]
+def build_bronze_paths(bronze_dir: str, process_date: str, lookback_days: int) -> list[str]:
+    """ build file paths for lookback days [D-K .. D] """
+    print(f"Building bronze paths for process_date={process_date}, lookback_days={lookback_days}")
+    d = datetime.strptime(process_date, "%Y-%m-%d").date()
+    dates = [(d - timedelta(days=i)).strftime("%Y-%m-%d") for i in range(lookback_days, -1, -1)]
+    
+    paths = []
+    for ds in dates:
+        p = f"{bronze_dir}/transactions_{ds}.csv"
+        if os.path.exists(p):
+            paths.append(p)
+        else:
+            print(f"Skipping missing file: {p}")
 
-def main():
-    args = parse_args()
+    if not paths:
+        raise FileNotFoundError(f"No bronze files found for process_date={process_date} (lookback={lookback_days})")
 
+    print(f"Dates to include: {dates}")
+    print(f"Bronze file paths: {paths}")
+
+    return paths
+
+
+def read_bronze_window(spark, paths: list[str]):
+    """ Read historical files from the path into a DataFrame """
+
+    if not paths:
+        print("No bronze paths available — returning empty DataFrame")
+        return spark.createDataFrame([], schema=None)  
+ 
+    df = (spark.read.option("header", True).csv(paths))  # Spark accepts a list of files
+    print(f"Successfully read bronze window. Row count so far: {df.count()}")
+    print(f"Columns: {df.columns}")
+    return df
+
+def read_and_normalize_data(spark: SparkSession, bronze_window: DataFrame) -> DataFrame:
+    """
+    Normalizes a pre-loaded bronze window DataFrame:
+      - Trim all strings; empty strings -> NULL
+      - Cast: txn_ts -> timestamp, amount -> decimal(18,2), is_refund -> boolean
+      - Enforce allowed sets for currency/mcc/status/channel/merchant_id; invalid -> NULL
+      - customer_id must match ^CUS\\d{4}$; invalid -> NULL
+      - transaction_id/card_id validated as UUID; invalid -> NULL
+      - Adds ingest_ts (now) and ingest_date (from path)
+    """
+
+    ALLOWED_MCC      = ["5411", "5812", "5999", "4121", "7011"]
+    ALLOWED_STATUS   = ["approved", "declined"]
+    ALLOWED_CHANNEL  = ["online", "pos", "mobile"]
+    ALLOWED_CURRENCY = ["KRW"]
+    ALLOWED_MERCHANTS = [f"MER{n}" for n in range(1000, 1021)]  # MER1000..MER1020
+    CUS_PATTERN      = r"^CUS\d{4}$"
+    UUID_V_PATTERN  = r"^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-5][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}$"
+    TRUE_SET  = ["true", "t", "1", "y", "yes"]
+    FALSE_SET = ["false", "f", "0", "n", "no"]
+
+    # Read CSV files and extract 'ingest_date' from the file path
+    df = (
+        bronze_window
+        # keep original file path per-row, then extract ingest_date from name
+        .withColumn("source_file", F.input_file_name())
+        .withColumn(
+            "ingest_date",
+            F.to_date(
+                F.regexp_extract(F.col("source_file"), r"transactions_(\d{4}-\d{2}-\d{2})\.csv", 1),
+                "yyyy-MM-dd"
+            )
+        )
+    )
+
+    # Trim all string columns and convert empty strings to NULL
+    str_cols = [f.name for f in df.schema.fields if isinstance(f.dataType, T.StringType)]
+    for c in str_cols:
+        df = df.withColumn(c, F.nullif(F.trim(F.col(c)), F.lit("")))
+
+    # Canonicalize case where useful
+    df = (
+        df
+        .withColumn("status",   F.lower(F.col("status")))
+        .withColumn("channel",  F.lower(F.col("channel")))
+        .withColumn("currency", F.upper(F.col("currency")))
+    )
+
+    # Cast core types
+    df = df.withColumn("txn_ts",  F.to_timestamp("txn_ts"))
+    df = df.withColumn("amount",  F.col("amount").cast(T.DecimalType(18, 2)))
+
+    # Tolerant boolean for is_refund
+    df = df.withColumn(
+        "is_refund",
+        F.when(F.col("is_refund").isNull(), F.lit(None).cast(T.BooleanType()))
+         .otherwise(
+            F.when(F.lower(F.col("is_refund")).isin([x.lower() for x in TRUE_SET]),  F.lit(True))
+             .when(F.lower(F.col("is_refund")).isin([x.lower() for x in FALSE_SET]), F.lit(False))
+             .otherwise(F.lit(None).cast(T.BooleanType()))
+         )
+    )
+
+    # Enum validations → invalid -> NULL
+    df = df.withColumn("currency",  F.when(F.col("currency").isin(ALLOWED_CURRENCY), F.col("currency")).otherwise(F.lit(None)))
+    df = df.withColumn("mcc",       F.when(F.col("mcc").isin(ALLOWED_MCC), F.col("mcc")).otherwise(F.lit(None)))
+    df = df.withColumn("status",    F.when(F.col("status").isin(ALLOWED_STATUS), F.col("status")).otherwise(F.lit(None)))
+    df = df.withColumn("channel",   F.when(F.col("channel").isin(ALLOWED_CHANNEL), F.col("channel")).otherwise(F.lit(None)))
+    df = df.withColumn("merchant_id", F.when(F.col("merchant_id").isin(ALLOWED_MERCHANTS), F.col("merchant_id")).otherwise(F.lit(None)))
+
+    # ID validations
+    df = df.withColumn("customer_id",   F.when(F.col("customer_id").rlike(CUS_PATTERN), F.col("customer_id")).otherwise(F.lit(None)))
+    df = df.withColumn("transaction_id",F.when(F.col("transaction_id").rlike(UUID_V_PATTERN), F.col("transaction_id")).otherwise(F.lit(None)))
+    df = df.withColumn("card_id",       F.when(F.col("card_id").rlike(UUID_V_PATTERN), F.col("card_id")).otherwise(F.lit(None)))
+
+    # Derived columns
+    df = df.withColumn("ingest_ts", F.current_timestamp())
+    df = df.withColumn("txn_date",  F.to_date(F.col("txn_ts")))
+    df = df.withColumn("year",  F.date_format("txn_date", "yyyy"))
+    df = df.withColumn("month", F.date_format("txn_date", "MM"))
+    df = df.withColumn("day",   F.date_format("txn_date", "dd"))
+
+    print(f"Successfully cleaned bronze window. Row count so far: {df.count()}")
+    print(f"Columns: {df.columns}")
+
+    return df
+
+
+def deduplicate_transactions(df: DataFrame) -> DataFrame:
+    """ Deduplicates transactions based on transaction_id. Record with the most recent ingest timestamp and txn_ts is kept.
+    """
+
+    # Define a window to partition by transaction_id and order by arrival and event time.
+    window = Window.partitionBy("transaction_id").orderBy(
+        F.col("ingest_ts").desc(), F.col("txn_ts").desc()
+    )
+
+    # Assign a row number and keep only the first one in each window.
+    deduped_df = df.withColumn("rn", F.row_number().over(window)).where("rn = 1").drop("rn")
+
+    total_count = df.count()
+    deduped_count = deduped_df.count()
+    
+    print(f"Deduplication complete: {deduped_count} rows remain ") 
+    print(f"({total_count - deduped_count} duplicates removed).")
+
+    return deduped_df
+
+
+def find_impacted_dates(df: DataFrame) -> Tuple[DataFrame, Optional[List[datetime.date]]]:
+    """ Prepares the DataFrame for writing by identifying impacted date partitions."""
+    
+    # Pull unique txn_date values that are not NULL (column must exist in df)
+    impacted_dates_rows = (
+        df.select("txn_date").distinct().where("txn_date IS NOT NULL").collect()
+    )
+    # If no rows, return (df, None)
+    if not impacted_dates_rows:
+        return df, None
+    
+    # Otherwise, sort the dates and return them
+    impacted_dates = sorted([row["txn_date"] for row in impacted_dates_rows])
+    print(f"Impacted partitions: {', '.join(str(d) for d in impacted_dates)}")
+
+    return df, impacted_dates
+
+
+def write_to_silver(df: DataFrame, silver_dir: str) -> None:
+    """ Writes the DataFrame to the silver layer, partitioned by date. """
+
+    output_path = os.path.join(silver_dir, "transactions")
+    (
+        df.write.mode("overwrite")
+        .partitionBy("year", "month", "day")
+        .parquet(output_path)
+    )
+
+    print(f"Write to silver completed successfully.")
+
+
+def main() -> None:
+    parser = argparse.ArgumentParser(description="Clean transaction data from bronze to silver.")
+    parser.add_argument("--bronze-dir", type=str, default="/app/data/bronze", help="Base directory for bronze data (e.g., /app/data/bronze).")
+    parser.add_argument("--silver-dir", type=str, default="/app/data/silver", help="Base directory for silver data (e.g., /app/data/silver).")
+    parser.add_argument("--process-date", type=str, required=True, help="The date for the job run in YYYY-MM-DD format.")
+    parser.add_argument("--lookback-days", type=int, default=2, help="Number of days to look back from the process date to read bronze data.")
+    args = parser.parse_args()
+
+    try:
+        process_date = datetime.strptime(args.process_date, "%Y-%m-%d")
+    except ValueError:
+        print("Error: Please provide the date in YYYY-MM-DD format.")
+        return
+    
     spark = (
-        SparkSession.builder
-        .appName("clean-transactions-late-aware")
-        # Make partition overwrite only touch partitions present in the write DF
+        SparkSession.builder.appName("clean-transactions-late-aware")
         .config("spark.sql.sources.partitionOverwriteMode", "dynamic")
         .getOrCreate()
     )
 
-    # 1) Discover a small window of bronze ingest_date folders
-    ingest_paths = build_ingest_paths(args.bronze_dir, args.process_date, args.lookback_days)
-    if not ingest_paths:
-        print(f"[WARN] No bronze folders found for window ending {args.process_date} "
-              f"(lookback={args.lookback_days}). Nothing to do.")
-        spark.stop()
-        return
+    # Build bronze path and window
+    bronze_path_list = build_bronze_paths(args.bronze_dir, args.process_date, args.lookback_days)
+    bronze_window = read_bronze_window(spark, bronze_path_list)
 
-    print("[INFO] Reading bronze paths:")
-    for p in ingest_paths: print("  -", p)
+    # Read and normalize the data.
+    normalized_df = read_and_normalize_data(spark, bronze_window)
 
-    # 2) Read and normalize + attach 'ingest_date' (arrival signal) from file path
-    df = (spark.read.option("header", True).csv(ingest_paths)
-          .withColumn(
-              "ingest_date",
-              F.to_date(F.regexp_extract(F.input_file_name(), r"ingest_date=([0-9\-]+)", 1))
-          ))
+    # Deduplicate transactions.
+    deduped_df = deduplicate_transactions(normalized_df)
 
-    # Type normalization
-    cleaned = (
-        df
-        .withColumn("txn_ts", F.to_timestamp("txn_ts"))
-        .withColumn("amount", F.col("amount").cast("decimal(18,2)"))
-        .withColumn("is_refund", F.when(F.lower("is_refund") == "true", F.lit(True)).otherwise(F.lit(False)))
-        .withColumn("status", F.lower(F.col("status")))
-        .withColumn("currency", F.upper(F.col("currency")))  # keep KRW normalized
-    )
+    # Prepare for writing by identifying impacted partitions.
+    to_write_df, impacted_dates = find_impacted_dates(deduped_df)
 
-    # 3) Deduplicate: newest arrival (ingest_date DESC) wins; tie-break by txn_ts DESC
-    w = Window.partitionBy("transaction_id").orderBy(F.col("ingest_date").desc(), F.col("txn_ts").desc())
-    deduped = cleaned.withColumn("rn", F.row_number().over(w)).where("rn = 1").drop("rn")
-
-    # 4) Compute impacted txn calendar dates and restrict write to only those partitions
-    with_dates = (
-        deduped
-        .withColumn("year",  F.year("txn_ts"))
-        .withColumn("month", F.date_format("txn_ts", "MM"))
-        .withColumn("day",   F.date_format("txn_ts", "dd"))
-        .withColumn("txn_date", F.to_date("txn_ts"))
-    )
-
-    impacted_dates_rows = with_dates.select("txn_date").distinct().where("txn_date IS NOT NULL").collect()
-    impacted_dates = sorted([r["txn_date"] for r in impacted_dates_rows])
     if not impacted_dates:
         print("[WARN] No valid txn_date rows after normalization. Nothing to write.")
         spark.stop()
         return
 
-    # Keep only rows we intend to overwrite
-    to_write = with_dates.where(F.col("txn_date").isin(impacted_dates))
-
-    # 5) Write only impacted partitions (Parquet), partitioned by business date
-    out = os.path.join(args.silver_dir, "transactions")
-    (to_write
-        .drop("txn_date")  # not needed in the stored schema
-        .write
-        .mode("overwrite")
-        .partitionBy("year", "month", "day")
-        .parquet(out)
-    )
-
-    # 6) Simple quality metrics
-    total = to_write.count()
-    distinct_ids = to_write.select("transaction_id").distinct().count()
-    dup_rate = float(1 - (distinct_ids / total)) if total else 0.0
-
-    # Log preview of impacted partitions (year-month-day)
-    ymd = (
-        to_write
-        .select("year", "month", "day")
-        .distinct()
-        .orderBy("year", "month", "day")
-        .limit(args.preview)
-        .collect()
-    )
-    impacted_preview = [f"{r['year']}-{r['month']}-{r['day']}" for r in ymd]
-
-    print(f"silver_path={out}")
-    print(f"process_date={args.process_date} lookback_days={args.lookback_days}")
-    print(f"rows={total} distinct_txn_id={distinct_ids} apparent_dup_rate={dup_rate:.6f}")
-    print(f"num_columns={len(to_write.columns)}")
-    print(f"impacted_partitions_count={len(impacted_dates)}")
-    print(f"impacted_partitions_preview={impacted_preview}")
+    # Write the cleaned data to the silver layer.
+    write_to_silver(to_write_df, args.silver_dir)
 
     spark.stop()
 

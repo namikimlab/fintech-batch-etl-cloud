@@ -57,6 +57,7 @@ def create_transaction(today: datetime):
         "channel": random.choice(["online", "pos", "mobile"]),
     }
 
+
 def generate_transactions_for_date(num_normal_tx: int, today: datetime):
     """Generates a list of transactions for a specific date."""
     normal_transactions = [create_transaction(today) for _ in range(num_normal_tx)]
@@ -65,6 +66,7 @@ def generate_transactions_for_date(num_normal_tx: int, today: datetime):
     print(f"Columns: {normal_transactions[0].keys()}") 
 
     return normal_transactions 
+
 
 def read_transactions_from_file(file_path: str):
     """Reads transactions from a CSV file."""
@@ -78,6 +80,7 @@ def read_transactions_from_file(file_path: str):
     except Exception as e:
         print(f"Error reading {file_path}: {e}")
         return []
+
 
 def inject_late_arrivals(normal_transactions: list, total_num_transactions: int, num_late:int, today: datetime, source_dir: str):
     """Injects late-arriving transactions from D-1 and D-2 by reading from existing files."""
@@ -108,6 +111,7 @@ def inject_late_arrivals(normal_transactions: list, total_num_transactions: int,
     print(f"Successfully injected {len(late_arrivals)} late arrivals.")
     return normal_transactions + late_arrivals
 
+
 def inject_duplicates(transactions: list, num_dupes: int):
     """Injects duplicate transactions."""
     print(f"Injecting {num_dupes} duplicates...")
@@ -131,6 +135,7 @@ def inject_duplicates(transactions: list, num_dupes: int):
 
     return transactions + duplicates_to_add
 
+
 def write_to_csv(transactions: list, output_path: str):
     """Writes the list of transactions to a CSV file."""
     if not transactions:
@@ -150,6 +155,7 @@ def write_to_csv(transactions: list, output_path: str):
         writer.writeheader()
         writer.writerows(transactions)
     print(f"Successfully wrote {len(transactions)} records to {output_path}")
+
 
 def main():
     parser = argparse.ArgumentParser(description="Generate synthetic transaction data.")
@@ -192,6 +198,7 @@ def main():
     
     os.makedirs(args.output_dir, exist_ok=True)
     write_to_csv(final_transactions, output_path)
+
 
 if __name__ == "__main__":
     main()
