@@ -57,9 +57,14 @@ def create_transaction(today: datetime):
         "channel": random.choice(["online", "pos", "mobile"]),
     }
 
-def generate_transactions_for_date(num_transactions: int, today: datetime):
+def generate_transactions_for_date(num_normal_tx: int, today: datetime):
     """Generates a list of transactions for a specific date."""
-    return [create_transaction(today) for _ in range(num_transactions)]
+    normal_transactions = [create_transaction(today) for _ in range(num_normal_tx)]
+
+    print(f"Successfully generated {num_normal_tx} normal transactions for {today}")
+    print(f"Columns: {normal_transactions[0].keys()}") 
+
+    return normal_transactions 
 
 def read_transactions_from_file(file_path: str):
     """Reads transactions from a CSV file."""
@@ -74,42 +79,43 @@ def read_transactions_from_file(file_path: str):
         print(f"Error reading {file_path}: {e}")
         return []
 
-def inject_late_arrivals(transactions: list, late_rate: float, today: datetime, source_dir: str):
+def inject_late_arrivals(normal_transactions: list, total_num_transactions: int, num_late:int, today: datetime, source_dir: str):
     """Injects late-arriving transactions from D-1 and D-2 by reading from existing files."""
-    if late_rate == 0:
-        return transactions
+    print(f"Injecting {num_late} late arrivals...")
 
-    num_late_arrivals = int(len(transactions) * late_rate)
-    if num_late_arrivals == 0:
-        return transactions
-
+    if num_late == 0:
+        return normal_transactions
+    
     potential_late_arrivals = []
     for days_ago in [1, 2]:
         past_date = today - timedelta(days=days_ago)
         file_path = os.path.join(source_dir, f"transactions_{past_date.strftime('%Y-%m-%d')}.csv")
         potential_late_arrivals.extend(read_transactions_from_file(file_path))
 
+    # when no historical data found, inject more normal transactions instead 
     if not potential_late_arrivals:
         print("Warning: No historical data found to source late arrivals from.")
-        return transactions
-
-    num_to_sample = min(num_late_arrivals, len(potential_late_arrivals))
+        print(f"Creating {num_late} additional normal transaction data instead")
+        additional_normal_tx = [create_transaction(today) for _ in range(num_late)]
+        return normal_transactions + additional_normal_tx
+    
+    # when historical data found, randomly pick some to add to todays data as late records
+    num_to_sample = min(num_late, len(potential_late_arrivals))
     
     print(f"Sampling {num_to_sample} late arrivals from a pool of {len(potential_late_arrivals)} historical transactions.")
     late_arrivals = random.sample(potential_late_arrivals, num_to_sample)
     
-    return transactions + late_arrivals
+    print(f"Successfully injected {len(late_arrivals)} late arrivals.")
+    return normal_transactions + late_arrivals
 
-def inject_duplicates(transactions: list, dup_rate: float):
+def inject_duplicates(transactions: list, num_dupes: int):
     """Injects duplicate transactions."""
-    if dup_rate == 0:
-        return transactions
-        
-    num_duplicates = int(len(transactions) * dup_rate)
-    if num_duplicates == 0:
+    print(f"Injecting {num_dupes} duplicates...")
+    
+    if num_dupes == 0:
         return transactions
 
-    duplicates_to_add = random.sample(transactions, num_duplicates)
+    duplicates_to_add = random.sample(transactions, num_dupes)
     
     # Jitter timestamp for duplicates
     for duplicate in duplicates_to_add:
@@ -120,6 +126,8 @@ def inject_duplicates(transactions: list, dup_rate: float):
         except (ValueError, TypeError):
             # Handle cases where timestamp might be in a different format or not a string
             pass
+        
+    print(f"Successfully Injected {len(duplicates_to_add)} duplicate transactions.")
 
     return transactions + duplicates_to_add
 
@@ -145,17 +153,11 @@ def write_to_csv(transactions: list, output_path: str):
 
 def main():
     parser = argparse.ArgumentParser(description="Generate synthetic transaction data.")
-    
-    parser.add_argument("--today", required=True, help="The date for the transaction data in YYYY-MM-DD format.")
-    
-    parser.add_argument("--num-transactions", type=int, default=1000, help="Number of transactions to generate for the date.")
-    
-    parser.add_argument("--late-rate", type=float, default=0.1, help="Ratio of late-arriving transactions to inject.")
-    
-    parser.add_argument("--dup-rate", type=float, default=0.05, help="Ratio of duplicate transactions to inject.")
-    
-    parser.add_argument("--output-dir", default="./app/data/bronze", help="Directory to save the output CSV file.")
-    
+    parser.add_argument("--today", required=True, help="The date for the transaction data in YYYY-MM-DD format.",)
+    parser.add_argument("--num-transactions", type=int, default=1000, help="Number of transactions to generate for the date.",)
+    parser.add_argument("--late-rate", type=float, default=0.1, help="Ratio of late-arriving transactions to inject.",)
+    parser.add_argument("--dup-rate", type=float, default=0.05, help="Ratio of duplicate transactions to inject.",)
+    parser.add_argument("--output-dir", default="/app/data/bronze", help="Directory to save the output CSV file.")
     args = parser.parse_args()
 
     try:
@@ -164,24 +166,31 @@ def main():
         print("Error: Please provide the date in YYYY-MM-DD format.")
         return
 
-    # 1. Generate Today's Data
-    print(f"Generating {args.num_transactions} transactions for {args.today}...")
-    daily_transactions = generate_transactions_for_date(args.num_transactions, today)
+    total_num_transactions = args.num_transactions
+    num_late = round(total_num_transactions * args.late_rate)
+    num_dupes = round(total_num_transactions * args.dup_rate)
 
-    # 2. Inject Late Arrivals
-    print(f"Injecting {args.late_rate * 100}% late arrivals...")
-    transactions_with_late_arrivals = inject_late_arrivals(daily_transactions, args.late_rate, today, args.output_dir)
+    if num_late + num_dupes > total_num_transactions:
+        raise ValueError("late_rate + dup_rate must not exceed 1.0")
 
-    # 3. Inject Duplicates
-    print(f"Injecting {args.dup_rate * 100}% duplicates...")
-    final_transactions = inject_duplicates(transactions_with_late_arrivals, args.dup_rate)
+    num_normal_transactions = total_num_transactions - num_late - num_dupes
+
+    print(f"Generating total {total_num_transactions} transactions for {args.today}...")
+
+    # Generate Today's Data - normal transacitons only
+    normal_transactions = generate_transactions_for_date(num_normal_transactions, today)
+
+    # Inject Late Arrivals
+    transactions_with_late_arrivals = inject_late_arrivals(normal_transactions, total_num_transactions, num_late, today, args.output_dir)
+
+    # Inject Duplicates
+    final_transactions = inject_duplicates(transactions_with_late_arrivals, num_dupes)
     
-    # 4. Write Daily CSV
+    # Write Daily CSV
     output_filename = f"transactions_{args.today}.csv"
     output_path = os.path.join(args.output_dir, output_filename)
     
     os.makedirs(args.output_dir, exist_ok=True)
-    
     write_to_csv(final_transactions, output_path)
 
 if __name__ == "__main__":

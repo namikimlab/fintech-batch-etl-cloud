@@ -45,7 +45,7 @@ with DAG(
     default_args=default_args,
     max_active_runs=1,
     render_template_as_native_obj=True,
-    description="M3: seed → spark → S3 → Redshift COPY → dbt (facts incremental + marts)",
+    description="seed → spark → S3 → Redshift COPY → dbt (facts incremental + marts)",
     template_searchpath=["/opt/airflow/sql"],
 ) as dag:
 
@@ -53,18 +53,16 @@ with DAG(
     seed_for_day = BashOperator(
         task_id="seed_for_day",
         bash_command=(
-            "python /opt/airflow/scripts/faker_seed.py "
-            "--days 1 "
-            "--for-date {{ ds }} "
-            f"--records-per-day {RECORDS_PER_DAY} "
+            "python /opt/airflow/scripts/generate_transactions.py "
+            "--today {{ ds }} "
+            f"--num-transactions {RECORDS_PER_DAY} "
             f"--dup-rate {DUP_RATE} "
             f"--late-rate {LATE_RATE} "
-            "--seed {{ ds_nodash }} "
-            f"--bronze-dir {BRONZE_DIR}"
+            f"--output-dir {BRONZE_DIR}"
         ),
     )
 
-    # 2) Spark: bronze → S3 silver (Parquet, partitioned by y/m/d), late-aware
+    # 2) Spark: bronze → silver (Parquet, partitioned by y/m/d), late-aware
     spark_clean_for_day = BashOperator(
         task_id="spark_clean_for_day",
         bash_command=(
