@@ -497,6 +497,464 @@
       "meta": {},
       "severity": "critical",
       "type": "expect_column_values_to_be_unique"
+    },
+    {
+      "id": "270e42f0-bb96-44f7-844c-b7ccd0e80744",
+      "kwargs": {
+        "column": "transaction_id"
+      },
+      "meta": {},
+      "severity": "critical",
+      "type": "expect_column_to_exist"
+    },
+    {
+      "id": "4fd0c197-b573-48c8-b508-1cb97c3da793",
+      "kwargs": {
+        "column": "customer_id"
+      },
+      "meta": {},
+      "severity": "critical",
+      "type": "expect_column_to_exist"
+    },
+    {
+      "id": "cb76bade-05e8-4239-818e-dd4534b3efad",
+      "kwargs": {
+        "column": "card_id"
+      },
+      "meta": {},
+      "severity": "critical",
+      "type": "expect_column_to_exist"
+    },
+    {
+      "id": "0566668b-9cd8-41a2-a2e4-b4cfe474d9a2",
+      "kwargs": {
+        "column": "merchant_id"
+      },
+      "meta": {},
+      "severity": "critical",
+      "type": "expect_column_to_exist"
+    },
+    {
+      "id": "fee3cee4-588e-41f3-8c36-b26eab93994f",
+      "kwargs": {
+        "column": "txn_ts"
+      },
+      "meta": {},
+      "severity": "critical",
+      "type": "expect_column_to_exist"
+    },
+    {
+      "id": "44c2cc78-b603-440e-bb9c-93ff76f40eff",
+      "kwargs": {
+        "column": "amount"
+      },
+      "meta": {},
+      "severity": "critical",
+      "type": "expect_column_to_exist"
+    },
+    {
+      "id": "0f1d2fbe-f652-4ac1-be1d-ab2c8aaa3210",
+      "kwargs": {
+        "column": "currency"
+      },
+      "meta": {},
+      "severity": "critical",
+      "type": "expect_column_to_exist"
+    },
+    {
+      "id": "bb70eedf-3510-49fa-9966-a5145eaa51ac",
+      "kwargs": {
+        "column": "mcc"
+      },
+      "meta": {},
+      "severity": "critical",
+      "type": "expect_column_to_exist"
+    },
+    {
+      "id": "3fe47a88-d33b-4237-9c22-c9960ca582e8",
+      "kwargs": {
+        "column": "status"
+      },
+      "meta": {},
+      "severity": "critical",
+      "type": "expect_column_to_exist"
+    },
+    {
+      "id": "179f57de-b4fd-4429-9b81-b0539516a609",
+      "kwargs": {
+        "column": "is_refund"
+      },
+      "meta": {},
+      "severity": "critical",
+      "type": "expect_column_to_exist"
+    },
+    {
+      "id": "19108ac2-8278-41ce-998c-206171aed64b",
+      "kwargs": {
+        "column": "channel"
+      },
+      "meta": {},
+      "severity": "critical",
+      "type": "expect_column_to_exist"
+    },
+    {
+      "id": "7d004046-2e1f-44e9-add5-13a21f746a05",
+      "kwargs": {
+        "column": "source_file"
+      },
+      "meta": {},
+      "severity": "critical",
+      "type": "expect_column_to_exist"
+    },
+    {
+      "id": "937e78e9-a83b-40a2-826d-4bb6778e874c",
+      "kwargs": {
+        "column": "ingest_date"
+      },
+      "meta": {},
+      "severity": "critical",
+      "type": "expect_column_to_exist"
+    },
+    {
+      "id": "363cf7fc-6279-450b-8afc-eaf06bf1dc50",
+      "kwargs": {
+        "column": "ingest_ts"
+      },
+      "meta": {},
+      "severity": "critical",
+      "type": "expect_column_to_exist"
+    },
+    {
+      "id": "64a1fe68-1b55-4f70-b6b8-f94f2a6d2d83",
+      "kwargs": {
+        "column": "txn_date"
+      },
+      "meta": {},
+      "severity": "critical",
+      "type": "expect_column_to_exist"
+    },
+    {
+      "id": "1f75e19e-1004-450a-bcae-9e25e43d356a",
+      "kwargs": {
+        "column": "txn_ts",
+        "type_": "TimestampType"
+      },
+      "meta": {},
+      "severity": "critical",
+      "type": "expect_column_values_to_be_of_type"
+    },
+    {
+      "id": "7f4c548e-8e4f-4680-9449-2fd8c44726de",
+      "kwargs": {
+        "column": "is_refund",
+        "type_": "BooleanType"
+      },
+      "meta": {},
+      "severity": "critical",
+      "type": "expect_column_values_to_be_of_type"
+    },
+    {
+      "id": "c310e3fb-8a89-4fb8-a16b-883322d7d1b4",
+      "kwargs": {
+        "column": "ingest_ts",
+        "type_": "TimestampType"
+      },
+      "meta": {},
+      "severity": "critical",
+      "type": "expect_column_values_to_be_of_type"
+    },
+    {
+      "id": "ab4ca46d-7b95-4476-81d1-5a500d876d41",
+      "kwargs": {
+        "column": "currency",
+        "value_set": [
+          "KRW"
+        ]
+      },
+      "meta": {},
+      "severity": "critical",
+      "type": "expect_column_values_to_be_in_set"
+    },
+    {
+      "id": "52ea9883-15de-4aad-8a18-5096dd1c6016",
+      "kwargs": {
+        "column": "mcc",
+        "value_set": [
+          "5411",
+          "5812",
+          "5999",
+          "4121",
+          "7011"
+        ]
+      },
+      "meta": {},
+      "severity": "critical",
+      "type": "expect_column_values_to_be_in_set"
+    },
+    {
+      "id": "3e8c1ca9-96bb-4a00-9dd9-8b190e08b8be",
+      "kwargs": {
+        "column": "status",
+        "value_set": [
+          "approved",
+          "declined"
+        ]
+      },
+      "meta": {},
+      "severity": "critical",
+      "type": "expect_column_values_to_be_in_set"
+    },
+    {
+      "id": "98e7ba64-44fa-47f2-b515-1abe3678a5ab",
+      "kwargs": {
+        "column": "channel",
+        "value_set": [
+          "online",
+          "pos",
+          "mobile"
+        ]
+      },
+      "meta": {},
+      "severity": "critical",
+      "type": "expect_column_values_to_be_in_set"
+    },
+    {
+      "id": "84b97a1d-3550-4abd-8d5d-2da52962d4fb",
+      "kwargs": {
+        "column": "transaction_id"
+      },
+      "meta": {},
+      "severity": "critical",
+      "type": "expect_column_values_to_be_unique"
+    },
+    {
+      "id": "a8a44861-4e6c-4a59-8919-9192a3a1641b",
+      "kwargs": {
+        "column": "transaction_id"
+      },
+      "meta": {},
+      "severity": "critical",
+      "type": "expect_column_to_exist"
+    },
+    {
+      "id": "8ed7bbd0-19a5-4eb6-8918-29e6588608f3",
+      "kwargs": {
+        "column": "customer_id"
+      },
+      "meta": {},
+      "severity": "critical",
+      "type": "expect_column_to_exist"
+    },
+    {
+      "id": "0cec10e2-52f6-4444-bceb-f51cf592f51f",
+      "kwargs": {
+        "column": "card_id"
+      },
+      "meta": {},
+      "severity": "critical",
+      "type": "expect_column_to_exist"
+    },
+    {
+      "id": "72a44150-af35-4f1c-bdeb-3582cdfe75de",
+      "kwargs": {
+        "column": "merchant_id"
+      },
+      "meta": {},
+      "severity": "critical",
+      "type": "expect_column_to_exist"
+    },
+    {
+      "id": "8bfbc001-438b-48a6-8aaf-dfaff7dae544",
+      "kwargs": {
+        "column": "txn_ts"
+      },
+      "meta": {},
+      "severity": "critical",
+      "type": "expect_column_to_exist"
+    },
+    {
+      "id": "a644d18d-ebcf-442a-af35-4a53596124ae",
+      "kwargs": {
+        "column": "amount"
+      },
+      "meta": {},
+      "severity": "critical",
+      "type": "expect_column_to_exist"
+    },
+    {
+      "id": "f1a161e5-c67f-48df-b9f0-a0c3b6f5a82a",
+      "kwargs": {
+        "column": "currency"
+      },
+      "meta": {},
+      "severity": "critical",
+      "type": "expect_column_to_exist"
+    },
+    {
+      "id": "d7266529-aa11-4b24-b41e-4f8fa6135ead",
+      "kwargs": {
+        "column": "mcc"
+      },
+      "meta": {},
+      "severity": "critical",
+      "type": "expect_column_to_exist"
+    },
+    {
+      "id": "0afa4e19-0693-4e02-8e18-5b7ed68372e0",
+      "kwargs": {
+        "column": "status"
+      },
+      "meta": {},
+      "severity": "critical",
+      "type": "expect_column_to_exist"
+    },
+    {
+      "id": "3987b9c6-e29d-42fa-ab62-6771d3fdcb91",
+      "kwargs": {
+        "column": "is_refund"
+      },
+      "meta": {},
+      "severity": "critical",
+      "type": "expect_column_to_exist"
+    },
+    {
+      "id": "78d424d6-bd87-4141-ac55-c8918a5bc9ec",
+      "kwargs": {
+        "column": "channel"
+      },
+      "meta": {},
+      "severity": "critical",
+      "type": "expect_column_to_exist"
+    },
+    {
+      "id": "be8329e6-ac9a-4a2f-a240-9e713c6a9194",
+      "kwargs": {
+        "column": "source_file"
+      },
+      "meta": {},
+      "severity": "critical",
+      "type": "expect_column_to_exist"
+    },
+    {
+      "id": "43485cd2-7d90-42ba-825d-14b89243c73c",
+      "kwargs": {
+        "column": "ingest_date"
+      },
+      "meta": {},
+      "severity": "critical",
+      "type": "expect_column_to_exist"
+    },
+    {
+      "id": "5451d06f-c2b9-400a-b3d3-716c085f303e",
+      "kwargs": {
+        "column": "ingest_ts"
+      },
+      "meta": {},
+      "severity": "critical",
+      "type": "expect_column_to_exist"
+    },
+    {
+      "id": "25004ff8-d8e3-4e57-b748-8f323ae41c64",
+      "kwargs": {
+        "column": "txn_date"
+      },
+      "meta": {},
+      "severity": "critical",
+      "type": "expect_column_to_exist"
+    },
+    {
+      "id": "49f1bb54-fe81-4681-beff-b62a4ff4883b",
+      "kwargs": {
+        "column": "txn_ts",
+        "type_": "TimestampType"
+      },
+      "meta": {},
+      "severity": "critical",
+      "type": "expect_column_values_to_be_of_type"
+    },
+    {
+      "id": "3b67f693-dd12-4b5a-b261-2a7bd53be08e",
+      "kwargs": {
+        "column": "is_refund",
+        "type_": "BooleanType"
+      },
+      "meta": {},
+      "severity": "critical",
+      "type": "expect_column_values_to_be_of_type"
+    },
+    {
+      "id": "9d6ee9cb-11e7-4ef0-a861-4c6146005b48",
+      "kwargs": {
+        "column": "ingest_ts",
+        "type_": "TimestampType"
+      },
+      "meta": {},
+      "severity": "critical",
+      "type": "expect_column_values_to_be_of_type"
+    },
+    {
+      "id": "f1a8e825-4f55-49e8-a7c4-da178e0c75d8",
+      "kwargs": {
+        "column": "currency",
+        "value_set": [
+          "KRW"
+        ]
+      },
+      "meta": {},
+      "severity": "critical",
+      "type": "expect_column_values_to_be_in_set"
+    },
+    {
+      "id": "cb1b2e9a-afc1-4099-9f1a-04fc3e5b843f",
+      "kwargs": {
+        "column": "mcc",
+        "value_set": [
+          "5411",
+          "5812",
+          "5999",
+          "4121",
+          "7011"
+        ]
+      },
+      "meta": {},
+      "severity": "critical",
+      "type": "expect_column_values_to_be_in_set"
+    },
+    {
+      "id": "e4189a82-569c-45ba-b223-f1280ae8b782",
+      "kwargs": {
+        "column": "status",
+        "value_set": [
+          "approved",
+          "declined"
+        ]
+      },
+      "meta": {},
+      "severity": "critical",
+      "type": "expect_column_values_to_be_in_set"
+    },
+    {
+      "id": "0db8360b-071c-47c8-ba19-a66659afaedf",
+      "kwargs": {
+        "column": "channel",
+        "value_set": [
+          "online",
+          "pos",
+          "mobile"
+        ]
+      },
+      "meta": {},
+      "severity": "critical",
+      "type": "expect_column_values_to_be_in_set"
+    },
+    {
+      "id": "cde55215-6b9c-4f4d-8702-d89da1a5a980",
+      "kwargs": {
+        "column": "transaction_id"
+      },
+      "meta": {},
+      "severity": "critical",
+      "type": "expect_column_values_to_be_unique"
     }
   ],
   "id": "26acd007-e59e-4ca5-a5ea-f14b15692142",
