@@ -148,30 +148,3 @@ for method in methods:
 #     traceback.print_exc()
 
 
-# # Check the actual file structure
-# print("\n=== Directory Structure ===")
-# import os
-
-# def explore_directory(path, level=0, max_level=4):
-#     if level > max_level:
-#         return
-#     try:
-#         items = sorted(os.listdir(path))
-#         for item in items[:20]:  # Show more items
-#             item_path = os.path.join(path, item)
-#             indent = "  " * level
-#             if os.path.isdir(item_path):
-#                 print(f"{indent}{item}/")
-#                 if level < 2:  # Only go 2 levels deep initially
-#                     explore_directory(item_path, level + 1, max_level)
-#             else:
-#                 try:
-#                     size = os.path.getsize(item_path)
-#                     print(f"{indent}{item} ({size:,} bytes)")
-#                 except:
-#                     print(f"{indent}{item} [size unknown]")
-#     except Exception as e:
-#         print(f"{indent}[Error reading directory: {e}]")
-
-# base_path = "/app/data/silver/transactions"
-# explore_directory(base_path)

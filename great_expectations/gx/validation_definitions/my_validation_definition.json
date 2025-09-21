@@ -1,0 +1,22 @@
+{
+  "data": {
+    "asset": {
+      "id": "3f2dd473-2c77-4c81-9b9b-6e996e12ec1a",
+      "name": "transactions"
+    },
+    "batch_definition": {
+      "id": "656d0432-7698-4747-b4a1-2047891e2080",
+      "name": "silver_daily"
+    },
+    "datasource": {
+      "id": "5728dd1d-c4c1-418d-848a-66a7a8d599bc",
+      "name": "silver"
+    }
+  },
+  "id": "4e333013-3eaf-4a02-80a1-1c94c159a416",
+  "name": "my_validation_definition",
+  "suite": {
+    "id": "26acd007-e59e-4ca5-a5ea-f14b15692142",
+    "name": "my_expectation_suite"
+  }
+}

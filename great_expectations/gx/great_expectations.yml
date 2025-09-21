@@ -83,14 +83,14 @@ data_docs_sites:
 fluent_datasources:
   silver:
     type: spark_filesystem
-    id: 57681379-5b65-4f30-bfdf-66cc141dd629
+    id: 5728dd1d-c4c1-418d-848a-66a7a8d599bc
     assets:
       transactions:
         type: directory_parquet
-        id: cfc7f61b-094c-4b54-921a-abe22c4983b3
+        id: 3f2dd473-2c77-4c81-9b9b-6e996e12ec1a
         batch_definitions:
           silver_daily:
-            id: 2c0c5f07-ff05-417e-ad92-1d712e81ca58
+            id: 656d0432-7698-4747-b4a1-2047891e2080
             partitioner:
               column_name: txn_ts
               method_name: partition_on_year_and_month_and_day

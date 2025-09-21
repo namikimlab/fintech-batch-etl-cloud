@@ -5,6 +5,12 @@
 
 import great_expectations as gx
 
+data_source_name = "silver"
+data_asset_name = "transactions"
+batch_definition_name = "silver_daily"
+batch_definition_column = "txn_ts"
+suite_name = "my_expectation_suite"
+
 # Load File Data Context
 context = gx.get_context(
     mode="file",
@@ -13,29 +19,30 @@ context = gx.get_context(
 
 # Delete if existing data source is present 
 try:
-    context.data_sources.get("silver")
-    context.delete_datasource("silver")
+    context.data_sources.get(data_source_name)
+    context.delete_datasource(data_source_name)
 except:
     pass 
 
 # Create data source 
-my_ds = context.data_sources.add_spark_filesystem(
-    name="silver",
+data_source = context.data_sources.add_spark_filesystem(
+    name=data_source_name,
     base_directory="/app/data/silver",
 )
-print(f"✅ Datasource '{my_ds.name}' registered.")
+print(f"✅ Datasource '{data_source.name}' registered.")
 
 # Create data asset - partitioned parquet 
-my_asset = my_ds.add_directory_parquet_asset(
-    name="transactions",
+directory_parquet_asset = data_source.add_directory_parquet_asset(
+    name=data_asset_name,
     data_directory = "./transactions"
 )
-print(f"✅ Asset type {type(my_asset)}")
-print(f"✅ Asset '{my_asset.name}' registered.")
+
+print(f"✅ Asset type {type(directory_parquet_asset)}")
+print(f"✅ Asset '{directory_parquet_asset.name}' registered.")
 
 # Create batch definition - daily
-batch_definition = my_asset.add_batch_definition_daily(
-    name="silver_daily", column="txn_ts"
+batch_definition = directory_parquet_asset.add_batch_definition_daily(
+    name=batch_definition_name, column=batch_definition_column 
 )
 print("✅ Batch definition created")
 
@@ -43,3 +50,4 @@ print("✅ Batch definition created")
 batch = batch_definition.get_batch()  
 print("✅ Sample of data from the batch:")
 print(batch.head())
+

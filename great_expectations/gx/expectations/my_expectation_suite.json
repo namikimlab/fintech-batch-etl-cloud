@@ -1,0 +1,19 @@
+{
+  "expectations": [
+    {
+      "id": "5b587e6e-2e5b-4ede-b8a8-294f4bd46489",
+      "kwargs": {
+        "column": "txn_date"
+      },
+      "meta": {},
+      "severity": "critical",
+      "type": "expect_column_to_exist"
+    }
+  ],
+  "id": "26acd007-e59e-4ca5-a5ea-f14b15692142",
+  "meta": {
+    "great_expectations_version": "1.6.1"
+  },
+  "name": "my_expectation_suite",
+  "notes": null
+}
