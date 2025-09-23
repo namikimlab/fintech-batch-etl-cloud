@@ -82,6 +82,40 @@ services:
       _AIRFLOW_WWW_USER_USERNAME: ${_AIRFLOW_WWW_USER_USERNAME:-airflow}
       _AIRFLOW_WWW_USER_PASSWORD: ${_AIRFLOW_WWW_USER_PASSWORD:-airflow}
 
+  metabase:
+    image: metabase/metabase:latest
+    platform: linux/amd64
+    ports:
+      - 3000:3000                # Metabase UI accessible on http://localhost:3000
+    environment:
+      MB_DB_TYPE: postgres
+      MB_DB_DBNAME: ${POSTGRES_DB}
+      MB_DB_PORT: 5432
+      MB_DB_USER: ${POSTGRES_USER}
+      MB_DB_PASS: ${POSTGRES_PASSWORD}
+      MB_DB_HOST: postgres       
+    depends_on:
+      postgres:
+        condition: service_healthy
+    volumes:
+      - metabase_data:/metabase-data
+
+  marquez:
+    image: marquezproject/marquez:latest
+    platform: linux/amd64
+    environment:
+      MARQUEZ_DB_HOST: postgres
+      MARQUEZ_DB_USER: ${POSTGRES_USER}
+      MARQUEZ_DB_PASSWORD: ${POSTGRES_PASSWORD}
+      MARQUEZ_DB: marquez               # separate DB inside same Postgres
+      MARQUEZ_DB_PORT: 5432
+      MARQUEZ_PORT: 5000
+    depends_on:
+      postgres:
+        condition: service_healthy
+    ports:
+      - 5001:5000        
 
 volumes:
   postgres_data:
+  metabase_data:
