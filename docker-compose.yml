@@ -1,121 +1,79 @@
+# Minimal docker-compose file for Airflow 3.0.6-python3.12
+# Local exectuor 
+
 x-airflow-common: &airflow-common
-  build:
-    context: .
-    dockerfile: docker/airflow/Dockerfile
-  env_file: .env
-  environment:
-    &airflow-common-env
+  image: apache/airflow:3.0.6-python3.12
+  environment: &airflow-common-env
     AIRFLOW__CORE__EXECUTOR: LocalExecutor
-    AIRFLOW__CORE__DEFAULT_TIMEZONE: Asia/Seoul 
-    AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql+psycopg2://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres/${POSTGRES_DB}
-    AIRFLOW__CORE__LOAD_EXAMPLES: "False"
-    AIRFLOW__WEBSERVER__EXPOSE_CONFIG: "True"
-    AIRFLOW_UID: ${AIRFLOW_UID}
-    PYSPARK_PYTHON: python
+    AIRFLOW__CORE__AUTH_MANAGER: airflow.providers.fab.auth_manager.fab_auth_manager.FabAuthManager
+    AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql+psycopg2://airflow:airflow@postgres:5432/airflow
   volumes:
     - ./dags:/opt/airflow/dags
     - ./logs:/opt/airflow/logs
+    - ./config:/opt/airflow/config
     - ./plugins:/opt/airflow/plugins
-    - ./data:/app/data
-    - ./scripts:/opt/airflow/scripts
-    - ./jobs:/opt/airflow/jobs
-    - ./dbt:/opt/airflow/dbt
-    - ./data/duckdb:/opt/dbt/duckdb
-    - ~/.aws:/home/airflow/.aws:rw
-    - ./sql:/opt/airflow/sql
-    - ./great_expectations:/opt/airflow/great_expectations
-  user: "${AIRFLOW_UID}:0"
-  depends_on:
+  depends_on: &airflow-common-depends-on
     postgres:
       condition: service_healthy
 
 services:
-  etl:
-    build: ./docker/etl
-    env_file: .env
-    volumes:
-      - ./:/app           # code + Makefile
-      - ./data:/app/data  # local lake (bronze/silver)
-    working_dir: /app
-    command: bash -lc "tail -f /dev/null"  # keep container running
-
   postgres:
-    image: postgres:15
+    image: postgres:16
     environment:
-      POSTGRES_USER: ${POSTGRES_USER}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
-      POSTGRES_DB: ${POSTGRES_DB}
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
-      interval: 5s
-      timeout: 5s
-      retries: 10
+      - POSTGRES_USER=airflow
+      - POSTGRES_PASSWORD=airflow
+      - POSTGRES_DB=airflow
+    ports:
+      - "5432:5432"
     volumes:
-      - postgres_data:/var/lib/postgresql/data
-
-  airflow-webserver:
-    <<: *airflow-common
-    command: webserver
-    ports:
-      - 8080:8080
+      - postgres-db-volume:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD", "curl", "--fail", "http://localhost:8080/health"]
+      test: ["CMD", "pg_isready", "-U", "airflow"]
       interval: 10s
-      timeout: 10s
       retries: 5
-    restart: always
-
-  airflow-scheduler:
-    <<: *airflow-common
-    command: scheduler
-    ports:
-      - 8081:8081
-    restart: always
+      start_period: 5s
 
   airflow-init:
     <<: *airflow-common
     command: version
     environment:
       <<: *airflow-common-env
-      _AIRFLOW_DB_UPGRADE: 'true'
+      _AIRFLOW_DB_MIGRATE: 'true'
       _AIRFLOW_WWW_USER_CREATE: 'true'
       _AIRFLOW_WWW_USER_USERNAME: ${_AIRFLOW_WWW_USER_USERNAME:-airflow}
       _AIRFLOW_WWW_USER_PASSWORD: ${_AIRFLOW_WWW_USER_PASSWORD:-airflow}
-
-  metabase:
-    image: metabase/metabase:latest
-    platform: linux/amd64
-    ports:
-      - 3000:3000                # Metabase UI accessible on http://localhost:3000
-    environment:
-      MB_DB_TYPE: postgres
-      MB_DB_DBNAME: ${POSTGRES_DB}
-      MB_DB_PORT: 5432
-      MB_DB_USER: ${POSTGRES_USER}
-      MB_DB_PASS: ${POSTGRES_PASSWORD}
-      MB_DB_HOST: postgres       
     depends_on:
-      postgres:
-        condition: service_healthy
-    volumes:
-      - metabase_data:/metabase-data
+      <<: *airflow-common-depends-on
 
-  marquez:
-    image: marquezproject/marquez:latest
-    platform: linux/amd64
-    environment:
-      MARQUEZ_DB_HOST: postgres
-      MARQUEZ_DB_USER: ${POSTGRES_USER}
-      MARQUEZ_DB_PASSWORD: ${POSTGRES_PASSWORD}
-      MARQUEZ_DB: marquez               # separate DB inside same Postgres
-      MARQUEZ_DB_PORT: 5432
-      MARQUEZ_PORT: 5000
+  airflow-scheduler:
+    <<: *airflow-common
+    command: scheduler
+    healthcheck:
+      test: ["CMD", "curl", "--fail", "http://localhost:8974/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 30s
     depends_on:
-      postgres:
-        condition: service_healthy
+      <<: *airflow-common-depends-on
+      airflow-init:
+        condition: service_completed_successfully
+
+  airflow-apiserver:
+    <<: *airflow-common
+    command: api-server
     ports:
-      - 5001:5000        
+      - "8080:8080"
+    healthcheck:
+      test: ["CMD", "curl", "--fail", "http://localhost:8080/api/v2/version"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 30s
+    depends_on:
+      <<: *airflow-common-depends-on
+      airflow-init:
+        condition: service_completed_successfully
 
 volumes:
-  postgres_data:
-  metabase_data:
+  postgres-db-volume:
