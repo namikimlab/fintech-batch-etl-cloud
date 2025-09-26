@@ -36,4 +36,3 @@ ARG CONSTRAINTS_URL="https://raw.githubusercontent.com/apache/airflow/constraint
 # --- Python deps install with constraints (recommended approach) ---
 COPY requirements.txt /opt/airflow/requirements.txt
 RUN pip install --no-cache-dir -r /opt/airflow/requirements.txt -c "${CONSTRAINTS_URL}"
-

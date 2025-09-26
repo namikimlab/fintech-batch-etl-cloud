@@ -207,7 +207,6 @@ def main() -> None:
     
     spark = (
         SparkSession.builder.appName("clean-transactions-late-aware")
-        .config("spark.sql.session.timeZone", "Asia/Seoul")
         .config("spark.sql.sources.partitionOverwriteMode", "dynamic")
         .getOrCreate()
     )

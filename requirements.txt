@@ -1,6 +1,6 @@
 # Core packages for Airflow ETL container
-pyspark   # For Spark jobs
-faker     # For synthetic data generation in faker_seed.py
+pyspark==3.5.2   # For Spark jobs
+faker            # For synthetic data generation in faker_seed.py
 pyarrow
 pandas
 
@@ -14,5 +14,7 @@ apache-airflow-providers-amazon
 apache-airflow-providers-postgres
 
 # PG driver
-psycopg2
+psycopg2==2.9.10
 
+great_expectations
+great_expectations[spark]

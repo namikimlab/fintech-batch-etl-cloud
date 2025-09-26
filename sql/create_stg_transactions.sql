@@ -10,8 +10,5 @@ CREATE TABLE IF NOT EXISTS public.stg_transactions (
     status VARCHAR(50),
     is_refund BOOLEAN,
     channel VARCHAR(50),
-    source_file VARCHAR(256),
-    ingest_date DATE, 
-    ingest_ts TIMESTAMP,
-    txn_date DATE
+    ingest_date DATE
 );

@@ -83,18 +83,20 @@ data_docs_sites:
 fluent_datasources:
   silver:
     type: spark_filesystem
-    id: eeb6ec39-af51-4c91-8070-9b7f28a245f4
+    id: 5914a41e-ce8f-45cc-8172-4d0377c0b2e4
     assets:
-      transactions:
+      transactions_dir:
         type: directory_parquet
-        id: 68c0d6da-6e58-4849-97ba-2f41cb418bb1
+        id: 201ec8cc-2c55-40c6-b49a-a387836db22d
         batch_definitions:
-          silver_daily:
-            id: 084022bf-ee72-4ff2-a80d-66d28d774e09
+          daily:
+            id: 22a934b4-b8b2-4c5e-8f55-92ec226edecb
             partitioner:
               column_name: txn_ts
               method_name: partition_on_year_and_month_and_day
-        data_directory: transactions
-    base_directory: /app/data/silver
+        pathGlobFilter: '**/*.parquet'
+        recursiveFileLookup: true
+        data_directory: .
+    base_directory: /app/data/silver/transactions
 analytics_enabled:
 data_context_id: c4dbb675-7547-462a-9526-2b9b4bc3d8ce
