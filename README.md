@@ -6,3 +6,4 @@ Built a production-level Batch ETL with Airflow, Spark, Redshift, and dbt, inclu
 
 Result: Demonstrated 99.9% reliable ingestion, 70% cheaper queries, and near real-time marts (RFM/LTV) — directly enabling faster credit risk scoring and marketing insights in a fintech environment.
 
+.
