@@ -1,3 +1,5 @@
+-- On **Redshift Serverless**: we omit explicit dist/sort keys to allow **AUTO Table Optimization (ATO)** to manage distribution and sort strategy 
+
 -- models/facts/fact_transactions.sql
 {% if target.type == 'redshift' %}
   {{ config(
@@ -5,6 +7,7 @@
       unique_key='transaction_id',
       incremental_strategy='merge',
       on_schema_change='sync_all_columns',
+      -- Omit dist/sort to allow AUTO (Serverless). 
       post_hook=["analyze {{ this }}"]
   ) }}
 {% else %}

@@ -12,6 +12,7 @@ __pycache__/
 
 # --- Airflow ---
 logs/
+dags/__pycache__/
 airflow.cfg
 unittests.cfg
 
