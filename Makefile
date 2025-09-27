@@ -1,38 +1,51 @@
-ENV ?= .env
-include $(ENV)
-export
+# Simplified Makefile for fintech-batch-3
 
-# Build + start the single container
+# ==============================================================================
+# Docker Commands
+# ==============================================================================
+
 up:
 	docker compose up -d --build
 
-# Stop and remove container
 down:
 	docker compose down -v
 
-# (Optional) nuke local data
-clean:
-	rm -rf ./data/bronze ./data/silver
+# ==============================================================================
+# Data Generation and Processing
+# ==============================================================================
 
-# Generate bronze CSVs inside the container
 seed:
-	docker compose exec etl python scripts/faker_seed.py \
-	  --days $(DAYS) --records-per-day $(RECORDS_PER_DAY) \
-	  --dup-rate $(DUP_RATE) --late-rate $(LATE_RATE) \
-	  --bronze-dir $(BRONZE_DIR)
+	docker compose exec etl python scripts/generate_transactions.py
 
-# Run PySpark job (local mode) inside the container
-spark:
-	docker compose exec etl python jobs/clean_transactions.py \
-	  --bronze-dir $(BRONZE_DIR) --silver-dir $(SILVER_DIR)
+spark-job:
+	docker compose exec etl python jobs/clean_transactions.py
 
-# Quick existence check
-smoke:
-	docker compose exec etl ls -R /app/data/silver/transactions || true
+# ==============================================================================
+# dbt Commands
+# ==============================================================================
 
-# One-liner: build → seed → spark → smoke
-run:
-	make up && make seed && make spark && make smoke
+dbt-run:
+	docker compose exec airflow-webserver dbt run --project-dir /opt/airflow/dbt
+
+dbt-test:
+	docker compose exec airflow-webserver dbt test --project-dir /opt/airflow/dbt
+
+dbt-docs-generate:
+	docker compose exec airflow-webserver dbt docs generate --project-dir /opt/airflow/dbt
+
+dbt-docs-serve:
+	docker compose exec airflow-webserver dbt docs serve --project-dir /opt/airflow/dbt --port 8082
+
+# ==============================================================================
+# Great Expectations Commands
+# ==============================================================================
+
+gx-run:
+	docker compose exec etl python scripts/run_great_expectations.py
+
+# ==============================================================================
+# Airflow Commands
+# ==============================================================================
 
 airflow-up:
 	docker compose up -d --build airflow-webserver airflow-scheduler
@@ -40,8 +53,8 @@ airflow-up:
 airflow-init:
 	docker compose exec -T airflow-webserver airflow db init
 	docker compose exec -T airflow-webserver airflow users create \
-	  --username admin --password admin --firstname Nami --lastname Kim \
-	  --role Admin --email you@example.com
+	  --username admin --password admin --firstname Admin --lastname User \
+	  --role Admin --email admin@example.com
 
 airflow-logs:
 	docker compose logs -f airflow-scheduler
@@ -49,6 +62,13 @@ airflow-logs:
 airflow-trigger:
 	docker compose exec -T airflow-webserver airflow dags trigger daily_batch_local
 
-airflow-backfill:
-	@if [ -z "$(FROM)" ] || [ -z "$(TO)" ]; then echo "Usage: make airflow-backfill FROM=YYYY-MM-DD TO=YYYY-MM-DD"; exit 2; fi
-	docker compose exec -T airflow-webserver airflow dags backfill daily_batch_local -s $(FROM) -e $(TO)
+# ==============================================================================
+# Convenience Commands
+# ==============================================================================
+
+run-all: up seed spark-job dbt-run dbt-test gx-run
+
+clean:
+	rm -rf ./data/duckdb
+
+.PHONY: up down seed spark-job dbt-run dbt-test dbt-docs-generate dbt-docs-serve gx-run airflow-up airflow-init airflow-logs airflow-trigger run-all clean

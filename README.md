@@ -1,9 +1,13 @@
-# 💳 Fintech Batch ETL
+[🇺🇸 English](./README.md) | [🇰🇷 한국어](./README.ko.md)
 
+# 💳 Fintech Batch ETL with Redshift Cloud Integration
+> End-to-end batch data pipeline with Airflow, Spark, dbt, Redshift, and S3
+
+![workflow](/screenshots/workflow.png)
 # Overview
 This repository implements a production-style Batch ETL pipeline for processing fintech transaction data.
 
-The pipeline demonstrates how to ingest, clean, transform, and model financial transactions in a way that is scalable, reliable, and cloud-ready.
+The pipeline demonstrates how to ingest, clean, transform, and model financial transactions in a way that can processes millions of synthetic transactions daily.
 
 **Use Case**
 
@@ -21,7 +25,7 @@ The pipeline demonstrates how to ingest, clean, transform, and model financial t
 
 # Architecture
 
-## High-Level ETL Flow
+## Pipeline Architecture
 
 ```
 [Faker Generator] 
@@ -39,6 +43,7 @@ The pipeline demonstrates how to ingest, clean, transform, and model financial t
 ```
 
 ## Components
+![Airflow DAG](</screenshots/Screen Shot 2025-09-27 at 12.54.10 PM.png>)
 
 * **Airflow** → Orchestrates all pipeline steps (daily ETL, retries, backfills).
 * **Spark** → Cleanses, deduplicates, and partitions raw data into Parquet. Handles schema evolution and late arrivals.
@@ -46,15 +51,16 @@ The pipeline demonstrates how to ingest, clean, transform, and model financial t
   * **Bronze**: Raw JSON/CSV dumps, partitioned by `ingest_date`.
   * **Silver**: Curated Parquet with enforced schema and quality checks.
 * **AWS Redshift** → Primary warehouse for staging, fact/dim tables, and marts.
+
 * **dbt** → Models marts (RFM, LTV, cohort analysis) and enforces data tests.
 * **Great Expectations** → Validates Silver data before load.
 
 ## Data Flow: Bronze → Silver → Gold
-
 * **Bronze (Raw Zone)**:
 
   * Direct landing of Faker-generated transactions in S3.
   * Immutable, schema-on-read, partitioned by ingest date.
+  * Retains full raw history for audits and replay.
 
 * **Silver (Curated Zone)**:
 
@@ -78,6 +84,7 @@ The pipeline demonstrates how to ingest, clean, transform, and model financial t
 * **Transactions** → credit card transaction events (core fact table)
 
 ## Warehouse Layers
+![dbt lineage](/screenshots/dbt_graph.png)
 
 * **Staging (`stg_*`)** → 1:1 cleaned data from S3 Silver
 * **Dimensions (`dim_*`)** → cards, merchants, customers
@@ -128,38 +135,43 @@ The pipeline demonstrates how to ingest, clean, transform, and model financial t
 * **Build marts** → run `dbt run` to create models in Redshift.
 * **Data quality** → dbt test built in dbt run + `run_great_expectations.py`
 
-# Monitoring & Maintenance
 
+# Monitoring & Maintenance
+![dbt test](/screenshots/dbt_test.png)
 * **Airflow UI** → monitor DAG runs, retries, and task logs.
 * **dbt docs / lineage** → view model dependencies and test results.
 
-# 10. Roadmap
+
+# Future Improvements
 
 Planned improvements to extend the project beyond the current batch ETL pipeline:
 
 * **Data Lakehouse Enhancements**
-
   * Introduce **Iceberg/Delta tables** on S3 for ACID transactions and upsert support
   * Explore Redshift Spectrum integration for external queries
 
 * **Streaming Pipeline**
-
   * Add Kafka → Spark Structured Streaming for near real-time ingestion
   * Fraud detection demo with streaming alerts
 
 * **CI/CD & Automation**
-
   * GitHub Actions for automated dbt runs and tests
   * Linting and unit testing for Spark and Airflow code
 
 * **Infrastructure as Code**
-
   * Manage AWS resources (S3, Redshift, IAM) with Terraform
   * Parameterize environment setup for reproducibility
 
 * **Monitoring & Observability**
-
   * Extend OpenLineage integration for dbt models
   * Add alerting on data quality failures (Slack/Email)
 
-* **AWS Glue + Athena** → Metadata catalog + ad-hoc query on S3 data.
+* **Cost Optimization** 
+  * Evaluate Redshift serveless vs. cluster cost 
+  * Use of Redshift Spectrum or Glue + Athena for ad-hoc queires 
+
+
+
+---
+🪲 by Nami Kim
+[Portfolio](https://namikimlab.github.io/) | [GitHub](https://github.com/namikimlab) | [Blog](https://namixkim.com) | [LinkedIn](https://linkedin.com/in/namixkim)
